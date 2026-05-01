@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FLEX Attendance System</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:     #0d1117; --surface: #161b22; --border: #30363d;
+    --accent: #58a6ff; --green:   #3fb950; --text: #e6edf3; --muted: #8b949e;
+    --mono:   'IBM Plex Mono',monospace; --sans: 'IBM Plex Sans',sans-serif;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:var(--sans);
+         min-height:100vh; display:flex; align-items:center; justify-content:center; }
+  .wrap { text-align:center; padding:40px 20px; }
+  .logo { font-family:var(--mono); font-size:48px; font-weight:600; color:var(--accent);
+          letter-spacing:8px; margin-bottom:8px; }
+  .sub  { color:var(--muted); font-size:15px; margin-bottom:64px; font-family:var(--mono); letter-spacing:2px; }
+  .cards { display:flex; gap:24px; justify-content:center; flex-wrap:wrap; }
+  .card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:16px; padding:40px 48px; width:260px;
+    text-decoration:none; color:var(--text);
+    transition:all .2s; display:flex; flex-direction:column; align-items:center; gap:16px;
+  }
+  .card:hover { border-color:var(--accent); transform:translateY(-4px); box-shadow:0 12px 32px rgba(88,166,255,.1); }
+  .card-icon { font-size:40px; }
+  .card-title { font-size:18px; font-weight:600; }
+  .card-desc { font-size:13px; color:var(--muted); text-align:center; line-height:1.5; }
+  .badge {
+    font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase;
+    padding:4px 12px; border-radius:99px; margin-top:4px;
+  }
+  .badge-faculty { background:rgba(88,166,255,.15); color:var(--accent); border:1px solid rgba(88,166,255,.3); }
+  .badge-student { background:rgba(63,185,80,.15);  color:var(--green);  border:1px solid rgba(63,185,80,.3); }
+  footer { margin-top:64px; font-size:12px; color:var(--muted); font-family:var(--mono); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">FLEX</div>
+  <div class="sub">Automated Attendance Subsystem · Group 5 Hello World</div>
+  <div class="cards">
+    <a href="/faculty.html" class="card">
+      <div class="card-icon">🎓</div>
+      <div class="card-title">Faculty Dashboard</div>
+      <div class="card-desc">Start sessions, display QR codes, view live roster, and manage attendance records.</div>
+      <span class="badge badge-faculty">faculty</span>
+    </a>
+    <a href="/student.html" class="card">
+      <div class="card-icon">📱</div>
+      <div class="card-title">Student Portal</div>
+      <div class="card-desc">Log in with roll number, scan QR code or enter token manually to mark attendance.</div>
+      <span class="badge badge-student">student</span>
+    </a>
+  </div>
+  <footer>SE-2001 · FAST-NUCES Lahore · Spring 2026</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=yes">
+<title>FLEX — Student</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f6fb;--sidebar:#1e2d4a;--sidebar2:#243558;
+  --accent:#2563eb;--accent2:#1d4ed8;--green:#16a34a;
+  --yellow:#ca8a04;--red:#dc2626;
+  --text:#1e293b;--muted:#64748b;--border:#e2e8f0;
+  --card:#fff;--radius:12px;
+  --font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden}
+
+/* ── Sidebar ── */
+.sidebar{width:240px;background:var(--sidebar);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.sidebar-brand{padding:24px 20px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+.brand-logo{font-size:22px;font-weight:700;color:#fff;letter-spacing:1px}
+.brand-sub{font-size:11px;color:rgba(255,255,255,.4);margin-top:2px}
+.sidebar-user{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08)}
+.user-name{font-size:13px;font-weight:600;color:#fff}
+.user-roll{font-size:11px;color:rgba(255,255,255,.4);margin-top:2px;font-family:var(--mono)}
+.nav-section{padding:8px 20px 4px;font-size:10px;font-weight:600;color:rgba(255,255,255,.3);letter-spacing:1.5px;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;cursor:pointer;color:rgba(255,255,255,.65);font-size:13px;font-weight:500;transition:all .15s;border-left:3px solid transparent}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav-item.active{background:rgba(37,99,235,.25);color:#fff;border-left-color:var(--accent)}
+.nav-item .icon{font-size:16px;width:20px;text-align:center}
+.nav-item .coming{font-size:9px;background:rgba(255,255,255,.12);color:rgba(255,255,255,.5);padding:2px 6px;border-radius:4px;margin-left:auto}
+.sidebar-logout{padding:16px 20px;border-top:1px solid rgba(255,255,255,.08);margin-top:auto}
+.logout-btn{display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.5);font-size:13px;cursor:pointer}
+.logout-btn:hover{color:#fff}
+
+/* ── Main ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{background:var(--card);border-bottom:1px solid var(--border);padding:0 28px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar-title{font-size:16px;font-weight:600}
+.content{flex:1;overflow-y:auto;padding:28px}
+
+/* Coming soon */
+.coming-page{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;color:var(--muted)}
+.coming-icon{font-size:56px;opacity:.4}
+.coming-title{font-size:20px;font-weight:600;color:var(--text)}
+.coming-sub{font-size:14px;text-align:center;max-width:320px;line-height:1.6}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px}
+.card+.card,.card+div{margin-top:20px}
+.card-title{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:16px}
+
+/* Forms */
+.fgroup{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+input,select{padding:11px 14px;border:1px solid var(--border);border-radius:8px;font-family:var(--font);font-size:14px;color:var(--text);background:#fff;outline:none;transition:border-color .15s;width:100%}
+input:focus{border-color:var(--accent)}
+input::placeholder{color:#c0c9d8}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 20px;border-radius:8px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all .15s;width:100%}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent2)}
+.btn-outline{background:#fff;border:1px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.camera-area{background:linear-gradient(135deg,#1e2d4a,#243558);border-radius:16px;padding:30px 20px;text-align:center;margin-bottom:16px;cursor:pointer}
+.camera-area:active{opacity:0.8}
+.camera-icon{font-size:64px;margin-bottom:12px}
+.camera-area p{color:#fff;margin-bottom:4px}
+.hint{font-size:11px;color:rgba(255,255,255,.5)}
+
+.session-found{background:#f0fdf4;border:1px solid #86efac;border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.session-dot{width:10px;height:10px;border-radius:50%;background:var(--green);animation:blink 1.2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.session-info .course{font-weight:600;font-size:14px}
+.session-info .topic{font-size:12px;color:var(--muted);margin-top:2px}
+.no-session{background:#fff7ed;border:1px solid #fdba74;border-radius:12px;padding:14px 20px;font-size:13px;color:#92400e;display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.preview-area{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;text-align:center;margin-top:16px}
+.preview-img{max-width:100%;border-radius:12px;margin-bottom:12px;border:2px solid var(--accent)}
+.divider{display:flex;align-items:center;gap:10px;margin:20px 0;color:var(--muted);font-size:12px}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.result-card{border-radius:14px;padding:24px;text-align:center}
+.result-card.success{background:#f0fdf4;border:1px solid #86efac}
+.result-card.error{background:#fef2f2;border:1px solid #fca5a5}
+.result-card.info{background:#eff6ff;border:1px solid #93c5fd}
+.result-icon{font-size:44px;margin-bottom:10px}
+.result-title{font-size:18px;font-weight:700;margin-bottom:6px}
+.result-msg{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:16px}
+.spill{display:inline-flex;align-items:center;gap:6px;padding:6px 18px;border-radius:99px;font-weight:700;font-size:13px}
+.sp-present{background:#dcfce7;color:#15803d}
+.sp-late{background:#fef9c3;color:#854d0e}
+.sp-error{background:#fee2e2;color:#b91c1c}
+
+.att-table{width:100%;border-collapse:collapse}
+.att-table th{text-align:left;padding:8px 14px;font-size:11px;font-weight:600;color:var(--muted);background:#f8fafc;border-bottom:1px solid var(--border)}
+.att-table td{padding:10px 14px;border-bottom:1px solid #f1f5f9;font-size:13px}
+
+#loginScreen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999}
+.login-box{background:#fff;border:1px solid var(--border);border-radius:20px;padding:40px;width:360px;box-shadow:0 20px 60px rgba(0,0,0,.08)}
+.login-logo{font-size:26px;font-weight:800;color:var(--accent);letter-spacing:2px;margin-bottom:4px}
+.login-sub{font-size:13px;color:var(--muted);margin-bottom:28px}
+.login-hint{font-size:12px;color:var(--muted);margin-top:14px;text-align:center}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1e293b;color:#fff;padding:11px 20px;border-radius:10px;font-size:13px;transition:transform .3s;z-index:200;white-space:nowrap}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.hidden{display:none}
+</style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">FLEX</div>
+    <div class="login-sub">Student Portal · FAST-NUCES Lahore</div>
+    <div class="fgroup">
+      <label>Roll Number</label>
+      <input id="loginRoll" value="24L-3083" placeholder="24L-XXXX">
+    </div>
+    <div class="fgroup">
+      <label>Password</label>
+      <input id="loginPass" type="password" value="pass" placeholder="••••••">
+    </div>
+    <button class="btn btn-primary" id="loginBtn">Sign In →</button>
+    <div class="login-hint">Roll: 24L-3083 · Password: pass</div>
+  </div>
+</div>
+
+<!-- App Shell -->
+<nav class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-logo">FLEX</div>
+    <div class="brand-sub">Student Portal</div>
+  </div>
+  <div class="sidebar-user">
+    <div class="user-name" id="sidebarName">—</div>
+    <div class="user-roll" id="sidebarRoll">—</div>
+  </div>
+  <div style="padding:12px 0;flex:1">
+    <div class="nav-section">Academic</div>
+    <div class="nav-item active" onclick="showPage('attendance')"><span class="icon">✅</span>Attendance</div>
+    <div class="nav-item" onclick="showPage('marks')"><span class="icon">📊</span>Marks &amp; Grades<span class="coming">Soon</span></div>
+    <div class="nav-item" onclick="showPage('transcript')"><span class="icon">📄</span>Transcript<span class="coming">Soon</span></div>
+  </div>
+  <div class="sidebar-logout">
+    <div class="logout-btn" onclick="doLogout()">⬅ Sign Out</div>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title" id="topbarTitle">Attendance</div>
+    <div style="font-size:13px;color:var(--muted)" id="topbarUser">—</div>
+  </div>
+  <div class="content" id="pageContent"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script>
+// State
+let student = null;
+let activeSession = null;
+let pollSesInt = null;
+
+// Toast function
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// Login function
+async function doLogin() {
+  const rollNo = document.getElementById('loginRoll').value.trim().toUpperCase();
+  const pass = document.getElementById('loginPass').value.trim();
+  
+  console.log('Login attempt:', rollNo, pass);
+  
+  if (!rollNo || !pass) {
+    toast('❌ Please enter roll number and password');
+    return;
+  }
+  
+  try {
+    const response = await fetch('/api/student/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rollNo, pass })
+    });
+    
+    const data = await response.json();
+    console.log('Response:', data);
+    
+    if (!response.ok) {
+      toast('❌ ' + (data.error || 'Invalid credentials'));
+      return;
+    }
+    
+    student = data;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('sidebarName').textContent = student.name;
+    document.getElementById('sidebarRoll').textContent = student.rollNo;
+    document.getElementById('topbarUser').textContent = student.name;
+    showPage('attendance');
+    toast('✅ Welcome ' + student.name);
+  } catch (error) {
+    console.error('Login error:', error);
+    toast('❌ Connection error. Make sure server is running.');
+  }
+}
+
+function doLogout() {
+  student = null;
+  if (pollSesInt) clearInterval(pollSesInt);
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('sidebarName').textContent = '—';
+  document.getElementById('sidebarRoll').textContent = '—';
+}
+
+// Page router
+function showPage(page) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (event && event.currentTarget) event.currentTarget.classList.add('active');
+  document.getElementById('topbarTitle').textContent = page === 'attendance' ? 'Attendance' : page;
+  const c = document.getElementById('pageContent');
+  
+  if (page === 'attendance') {
+    renderAttendance(c);
+  } else {
+    c.innerHTML = `<div class="coming-page"><div class="coming-icon">🔧</div><div class="coming-title">Coming Soon</div><div class="coming-sub">This feature will be available soon.</div></div>`;
+  }
+}
+
+// Render attendance page
+async function renderAttendance(c) {
+  c.innerHTML = `
+    <div id="sessionBanner"></div>
+    <div class="card" id="scanCard">
+      <div class="card-title">Mark Attendance</div>
+      <div class="camera-area" onclick="openCamera()">
+        <div class="camera-icon">📷</div>
+        <p>Tap to Open Camera</p>
+        <p class="hint">Take a photo of the QR code on faculty screen</p>
+      </div>
+      <div class="divider">OR</div>
+      <div class="fgroup">
+        <label>Session ID</label>
+        <input id="manSesId" placeholder="e.g. SES-1234567890">
+      </div>
+      <div class="fgroup">
+        <label>Token (from projector)</label>
+        <input id="manToken" placeholder="e.g. AB3XY9KL" maxlength="8">
+      </div>
+      <button class="btn btn-primary" onclick="manualSubmit()">Submit Attendance</button>
+    </div>
+    <div id="previewArea" style="display:none;"></div>
+    <div id="resultWrap" style="display:none;"></div>
+    <div class="card" style="margin-top:20px">
+      <div class="card-title">Attendance History</div>
+      <div id="histContent" style="color:var(--muted);font-size:13px">Loading...</div>
+    </div>
+  `;
+  
+  await refreshSessionBanner();
+  if (pollSesInt) clearInterval(pollSesInt);
+  pollSesInt = setInterval(refreshSessionBanner, 4000);
+}
+
+async function refreshSessionBanner() {
+  if (!student) return;
+  try {
+    const r = await fetch('/api/sessions');
+    const sessions = await r.json();
+    const active = sessions.find(s => !s.locked && s.section === student.section);
+    activeSession = active || null;
+    
+    const banner = document.getElementById('sessionBanner');
+    if (!banner) return;
+    
+    if (active) {
+      banner.innerHTML = `
+        <div class="session-found">
+          <div class="session-dot"></div>
+          <div class="session-info">
+            <div class="course">${active.courseCode} — ${active.topic}</div>
+            <div class="topic">Section ${active.section} · <span style="color:#16a34a;font-weight:600">Session Active</span></div>
+          </div>
+        </div>`;
+      const sid = document.getElementById('manSesId');
+      if (sid && !sid.value) sid.value = active.sessionId;
+    } else {
+      banner.innerHTML = `<div class="no-session">⚠️ No active session found. Ask faculty to start one.</div>`;
+    }
+  } catch(e) {}
+}
+
+// Camera and QR functions
+function openCamera() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.capture = 'environment';
+  
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const previewArea = document.getElementById('previewArea');
+    const scanCard = document.getElementById('scanCard');
+    
+    const imgUrl = URL.createObjectURL(file);
+    previewArea.innerHTML = `
+      <div class="preview-area">
+        <img src="${imgUrl}" class="preview-img">
+        <div style="color:#58a6ff; margin-top:12px;">🔍 Processing QR code...</div>
+      </div>
+    `;
+    previewArea.style.display = 'block';
+    if (scanCard) scanCard.style.display = 'none';
+    
+    const img = new Image();
+    img.src = imgUrl;
+    
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      let width = Math.min(img.width, 600);
+      let height = (img.height * width) / img.width;
+      canvas.width = width;
+      canvas.height = height;
+      ctx.drawImage(img, 0, 0, width, height);
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      
+      if (code) {
+        parseQR(code.data);
+      } else {
+        previewArea.innerHTML = `<div class="preview-area"><div style="color:#dc2626;">❌ No QR Code Found</div><button class="btn btn-outline" onclick="resetScanner()" style="margin-top:12px;">Try Again</button></div>`;
+      }
+      URL.revokeObjectURL(imgUrl);
+    };
+  };
+  input.click();
+}
+
+function parseQR(data) {
+  const parts = data.split('|');
+  if (parts.length !== 2) {
+    toast('Invalid QR code');
+    resetScanner();
+    return;
+  }
+  submitAttendance(parts[0], parts[1]);
+}
+
+function manualSubmit() {
+  const sesId = document.getElementById('manSesId').value.trim() || (activeSession ? activeSession.sessionId : '');
+  const token = document.getElementById('manToken').value.trim().toUpperCase();
+  if (!sesId) { toast('No active session found'); return; }
+  if (!token) { toast('Enter the token from the projector'); return; }
+  submitAttendance(sesId, token);
+}
+
+function resetScanner() {
+  const previewArea = document.getElementById('previewArea');
+  const scanCard = document.getElementById('scanCard');
+  const resultWrap = document.getElementById('resultWrap');
+  previewArea.style.display = 'none';
+  previewArea.innerHTML = '';
+  if (scanCard) scanCard.style.display = 'block';
+  if (resultWrap) resultWrap.style.display = 'none';
+}
+
+async function submitAttendance(sessionId, token) {
+  const scanCard = document.getElementById('scanCard');
+  const resultWrap = document.getElementById('resultWrap');
+  if (scanCard) scanCard.style.display = 'none';
+  if (resultWrap) resultWrap.style.display = 'block';
+  
+  try {
+    const response = await fetch('/api/student/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rollNo: student.rollNo, sessionId, token })
+    });
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      resultWrap.innerHTML = `
+        <div class="result-card success">
+          <div class="result-icon">✅</div>
+          <div class="result-title">${data.currentStatus === 'Present' ? 'Marked Present!' : data.currentStatus === 'Late' ? 'Marked Late' : 'Recorded'}</div>
+          <div class="spill ${data.currentStatus === 'Present' ? 'sp-present' : data.currentStatus === 'Late' ? 'sp-late' : 'sp-error'}">● ${data.currentStatus}</div>
+          <div class="result-msg">${data.message}</div>
+          <button class="btn btn-outline" onclick="resetScanner()">Scan Again</button>
+        </div>`;
+    } else {
+      resultWrap.innerHTML = `
+        <div class="result-card error">
+          <div class="result-icon">❌</div>
+          <div class="result-title">Failed</div>
+          <div class="result-msg">${data.error || 'Something went wrong'}</div>
+          <button class="btn btn-outline" onclick="resetScanner()">Try Again</button>
+        </div>`;
+    }
+  } catch (error) {
+    resultWrap.innerHTML = `<div class="result-card error"><div class="result-icon">❌</div><div class="result-title">Error</div><div class="result-msg">Network error</div><button class="btn btn-outline" onclick="resetScanner()">Try Again</button></div>`;
+  }
+}
+
+// Initialize event listeners
+document.addEventListener('DOMContentLoaded', function() {
+  const loginBtn = document.getElementById('loginBtn');
+  if (loginBtn) {
+    loginBtn.addEventListener('click', doLogin);
+  }
+  
+  const rollInput = document.getElementById('loginRoll');
+  const passInput = document.getElementById('loginPass');
+  if (rollInput) rollInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') doLogin(); });
+  if (passInput) passInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') doLogin(); });
+});
+</script>
+</body>
+</html>

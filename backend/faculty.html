@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FLEX — Faculty</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f6fb;--sidebar:#1e2d4a;--sidebar2:#243558;--top:#fff;
+  --accent:#2563eb;--accent2:#1d4ed8;--green:#16a34a;--yellow:#ca8a04;
+  --red:#dc2626;--orange:#ea580c;
+  --text:#1e293b;--muted:#64748b;--border:#e2e8f0;
+  --card:#fff;--radius:12px;
+  --font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden}
+
+/* ── Sidebar ── */
+.sidebar{width:240px;background:var(--sidebar);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.sidebar-brand{padding:24px 20px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+.brand-logo{font-size:22px;font-weight:700;color:#fff;letter-spacing:1px}
+.brand-sub{font-size:11px;color:rgba(255,255,255,.4);margin-top:2px;letter-spacing:.5px}
+.sidebar-user{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08)}
+.user-name{font-size:13px;font-weight:600;color:#fff}
+.user-role{font-size:11px;color:rgba(255,255,255,.45);margin-top:2px}
+.sidebar-nav{padding:12px 0;flex:1}
+.nav-section{padding:8px 20px 4px;font-size:10px;font-weight:600;color:rgba(255,255,255,.3);letter-spacing:1.5px;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;cursor:pointer;color:rgba(255,255,255,.65);font-size:13px;font-weight:500;transition:all .15s;border-left:3px solid transparent;position:relative}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav-item.active{background:rgba(37,99,235,.25);color:#fff;border-left-color:var(--accent)}
+.nav-item .icon{font-size:16px;width:20px;text-align:center}
+.nav-item .coming{font-size:9px;background:rgba(255,255,255,.12);color:rgba(255,255,255,.5);padding:2px 6px;border-radius:4px;margin-left:auto}
+.sidebar-logout{padding:16px 20px;border-top:1px solid rgba(255,255,255,.08)}
+.logout-btn{display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.5);font-size:13px;cursor:pointer;padding:8px 0}
+.logout-btn:hover{color:#fff}
+
+/* ── Main ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{background:var(--top);border-bottom:1px solid var(--border);padding:0 28px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar-title{font-size:16px;font-weight:600}
+.topbar-right{display:flex;align-items:center;gap:16px}
+.notif-btn{width:36px;height:36px;border-radius:50%;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px}
+.content{flex:1;overflow-y:auto;padding:28px}
+
+/* ── Coming Soon page ── */
+.coming-page{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;color:var(--muted)}
+.coming-icon{font-size:56px;opacity:.4}
+.coming-title{font-size:20px;font-weight:600;color:var(--text)}
+.coming-sub{font-size:14px;text-align:center;max-width:320px;line-height:1.6}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px}
+.card+.card{margin-top:20px}
+.card-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:16px}
+
+/* ── Form ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.form-full{grid-column:1/-1}
+.fgroup{display:flex;flex-direction:column;gap:5px}
+label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+input,select{padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-family:var(--font);font-size:14px;color:var(--text);background:#fff;outline:none;transition:border-color .15s}
+input:focus,select:focus{border-color:var(--accent)}
+input::placeholder{color:#c0c9d8}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:8px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent2)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-danger:hover{opacity:.85}
+.btn-outline{background:#fff;border:1px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.btn-sm{padding:6px 14px;font-size:12px}
+.btn-warning{background:#fef3c7;border:1px solid #f59e0b;color:#92400e}
+.btn-warning:hover{background:#fde68a}
+
+/* ── QR Section ── */
+.qr-area{background:linear-gradient(135deg,#1e2d4a 0%,#243558 100%);border-radius:16px;padding:32px;display:flex;gap:36px;align-items:center;margin-bottom:24px;color:#fff}
+.qr-wrap{background:#fff;padding:16px;border-radius:12px;flex-shrink:0;width:220px;height:220px;display:flex;align-items:center;justify-content:center}
+.qr-wrap img{width:188px;height:188px}
+.qr-info{flex:1}
+.qr-token{font-family:var(--mono);font-size:38px;font-weight:700;letter-spacing:10px;color:#60a5fa;margin:8px 0 16px}
+.timer-wrap{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.timer-track{flex:1;height:8px;background:rgba(255,255,255,.15);border-radius:99px;overflow:hidden}
+.timer-fill{height:100%;border-radius:99px;transition:width .4s linear,background .4s}
+.timer-num{font-family:var(--mono);font-size:14px;color:rgba(255,255,255,.7);width:32px;text-align:right}
+.window-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border-radius:99px;font-size:12px;font-weight:700;letter-spacing:.5px}
+.pill-opening{background:rgba(96,165,250,.2);border:1px solid rgba(96,165,250,.4);color:#93c5fd}
+.pill-closing{background:rgba(251,146,60,.2);border:1px solid rgba(251,146,60,.4);color:#fdba74}
+.pill-locked{background:rgba(248,113,113,.2);border:1px solid rgba(248,113,113,.4);color:#fca5a5}
+.pulse{animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* ── Stats ── */
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px}
+.stat-val{font-size:42px;font-weight:700;font-family:var(--mono);line-height:1}
+.stat-lbl{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin-top:4px}
+.s-green{color:var(--green)}.s-yellow{color:var(--yellow)}.s-red{color:var(--red)}
+
+/* ── Table ── */
+.roster-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.roster-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.roster-label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:10px 20px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;background:#f8fafc;border-bottom:1px solid var(--border)}
+td{padding:12px 20px;border-bottom:1px solid #f1f5f9;font-size:13px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafbfc}
+.roll-mono{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.sbadge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700}
+.sb-present{background:#dcfce7;color:#15803d}
+.sb-late{background:#fef9c3;color:#854d0e}
+.sb-absent{background:#fee2e2;color:#b91c1c}
+.sb-opening{background:#dbeafe;color:#1d4ed8}
+.sb-override{background:#fef3c7;color:#92400e}
+
+/* ── Override modal ── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);backdrop-filter:blur(3px);z-index:100;align-items:center;justify-content:center}
+.overlay.show{display:flex}
+.modal{background:#fff;border-radius:16px;padding:28px;width:400px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.modal h3{font-size:17px;font-weight:700;margin-bottom:20px}
+.modal .fgroup{margin-bottom:14px}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:24px;right:24px;background:#1e293b;color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;transform:translateY(80px);transition:transform .3s;z-index:200;display:flex;gap:8px;align-items:center;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+.toast.show{transform:translateY(0)}
+
+/* ── Login ── */
+#loginScreen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999}
+.login-box{background:#fff;border:1px solid var(--border);border-radius:20px;padding:40px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,.08)}
+.login-logo{font-size:28px;font-weight:800;color:var(--accent);letter-spacing:2px;margin-bottom:4px}
+.login-sub{font-size:13px;color:var(--muted);margin-bottom:28px}
+.login-hint{font-size:12px;color:var(--muted);margin-top:16px;text-align:center}
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">FLEX</div>
+    <div class="login-sub">Faculty Portal · FAST-NUCES Lahore</div>
+    <div class="fgroup" style="margin-bottom:12px">
+      <label>Faculty ID</label>
+      <input id="loginId" value="FAC-001" placeholder="FAC-001">
+    </div>
+    <div class="fgroup" style="margin-bottom:20px">
+      <label>Password</label>
+      <input id="loginPass" type="password" value="admin" placeholder="••••••">
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="doLogin()">Sign In →</button>
+    <div class="login-hint">Demo: FAC-001 / admin &nbsp;·&nbsp; FAC-002 / admin</div>
+  </div>
+</div>
+
+<!-- App Shell -->
+<nav class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-logo">FLEX</div>
+    <div class="brand-sub">Faculty Portal</div>
+  </div>
+  <div class="sidebar-user">
+    <div class="user-name" id="sidebarName">—</div>
+    <div class="user-role" id="sidebarRole">Faculty</div>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-section">Academic</div>
+    <div class="nav-item" onclick="showPage('dashboard')"><span class="icon">🏠</span>Dashboard</div>
+    <div class="nav-item active" onclick="showPage('attendance')"><span class="icon">✅</span>Attendance</div>
+    <div class="nav-item" onclick="showPage('marks')"><span class="icon">📊</span>Marks<span class="coming">Soon</span></div>
+    <div class="nav-item" onclick="showPage('grading')"><span class="icon">🎯</span>Grading<span class="coming">Soon</span></div>
+    <div class="nav-item" onclick="showPage('feedback')"><span class="icon">💬</span>Feedback<span class="coming">Soon</span></div>
+    <div class="nav-section">Reports</div>
+    <div class="nav-item" onclick="showPage('reports')"><span class="icon">📋</span>Faculty Reports<span class="coming">Soon</span></div>
+    <div class="nav-item" onclick="showPage('obe')"><span class="icon">📈</span>CLO / CQI<span class="coming">Soon</span></div>
+    <div class="nav-section">Other</div>
+    <div class="nav-item" onclick="showPage('fyp')"><span class="icon">🎓</span>FYP<span class="coming">Soon</span></div>
+    <div class="nav-item" onclick="showPage('requests')"><span class="icon">📩</span>Requests<span class="coming">Soon</span></div>
+  </div>
+  <div class="sidebar-logout">
+    <div class="logout-btn" onclick="doLogout()"><span>⬅</span> Sign Out</div>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title" id="topbarTitle">Attendance</div>
+    <div class="topbar-right">
+      <div class="notif-btn">🔔</div>
+      <div style="font-size:13px;color:var(--muted)" id="topbarUser">—</div>
+    </div>
+  </div>
+  <div class="content" id="pageContent"></div>
+</div>
+
+<!-- Override Modal -->
+<div class="overlay" id="overrideOverlay">
+  <div class="modal">
+    <h3>Manual Override</h3>
+    <input type="hidden" id="ovRollNo">
+    <div class="fgroup"><label>Student</label><input id="ovName" disabled></div>
+    <div class="fgroup">
+      <label>Set Status</label>
+      <select id="ovStatus">
+        <option value="Present">Present</option>
+        <option value="Late">Late</option>
+        <option value="Absent">Absent</option>
+      </select>
+    </div>
+    <div class="fgroup"><label>Reason</label><input id="ovReason" placeholder="e.g. GPS failure, verified physically present"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitOverride()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toastIcon">✓</span><span id="toastMsg"></span></div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let faculty       = null;
+let currentSesId  = null;
+let pollInterval  = null;
+let timerInterval = null;
+let tokenExpiry   = null;
+
+// ── Login ─────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const id   = document.getElementById('loginId').value.trim();
+  const pass = document.getElementById('loginPass').value.trim();
+  const r    = await fetch('/api/faculty/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,pass})});
+  if (!r.ok) { toast('❌ Invalid credentials','err'); return; }
+  faculty = await r.json();
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('sidebarName').textContent = faculty.name;
+  document.getElementById('sidebarRole').textContent = faculty.dept + ' Dept.';
+  document.getElementById('topbarUser').textContent  = faculty.name;
+  showPage('attendance');
+}
+
+function doLogout() {
+  faculty = null; currentSesId = null;
+  if (pollInterval)  clearInterval(pollInterval);
+  if (timerInterval) clearInterval(timerInterval);
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+// ── Page router ───────────────────────────────────────────────────────────────
+const PAGE_TITLES = {
+  dashboard:'Dashboard', attendance:'Attendance Management', marks:'Marks Management',
+  grading:'Grading', feedback:'Feedback', reports:'Faculty Reports',
+  obe:'CLO / CQI Reports', fyp:'FYP Management', requests:'Requests'
+};
+
+function showPage(page) {
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  event?.currentTarget?.classList.add('active');
+  document.getElementById('topbarTitle').textContent = PAGE_TITLES[page]||page;
+  const c = document.getElementById('pageContent');
+
+  if (page === 'attendance') { renderAttendancePage(c); return; }
+  if (page === 'dashboard')  { renderDashboard(c); return; }
+
+  // Coming soon
+  c.innerHTML = `
+    <div class="coming-page">
+      <div class="coming-icon">🔧</div>
+      <div class="coming-title">${PAGE_TITLES[page]}</div>
+      <div class="coming-sub">This module is part of the full FLEX system and will be available in a future release.<br><br>For now, the <strong>Attendance</strong> module is fully operational.</div>
+    </div>`;
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+function renderDashboard(c) {
+  c.innerHTML = `
+    <div style="margin-bottom:24px">
+      <h2 style="font-size:22px;font-weight:700">Welcome, ${faculty?.name?.split(' ')[0]} 👋</h2>
+      <p style="color:var(--muted);font-size:14px;margin-top:4px">${new Date().toLocaleDateString('en-PK',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px">
+      ${['Attendance','Marks','Grading','Feedback'].map((m,i) => `
+        <div class="card" style="cursor:pointer;${i===0?'border-color:var(--accent);':''}" onclick="showPage('${m.toLowerCase()}')">
+          <div style="font-size:24px;margin-bottom:10px">${['✅','📊','🎯','💬'][i]}</div>
+          <div style="font-weight:600;font-size:15px">${m}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">${i===0?'<span style="color:var(--green);font-weight:600">● Live</span>':'Coming soon'}</div>
+        </div>`).join('')}
+    </div>
+    <div class="card">
+      <div class="card-title">My Courses</div>
+      ${(faculty?.courses||[]).map(c => `
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+          <div style="width:40px;height:40px;background:#eff6ff;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">📚</div>
+          <div><div style="font-weight:600;font-size:14px">${c}</div><div style="font-size:12px;color:var(--muted)">BSE-243A · Spring 2026</div></div>
+          <button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="showPage('attendance')">Take Attendance</button>
+        </div>`).join('')}
+    </div>`;
+}
+
+// ── Attendance Page ───────────────────────────────────────────────────────────
+function renderAttendancePage(c) {
+  if (currentSesId) {
+    // Live session view
+    c.innerHTML = liveSessionHTML();
+    startPoll();
+  } else {
+    c.innerHTML = startSessionHTML();
+  }
+}
+
+function startSessionHTML() {
+  const courses = (faculty?.courses||['SE-2001']).map(c=>`<option value="${c}">${c}</option>`).join('');
+  return `
+    <div class="card" style="max-width:600px">
+      <div class="card-title">Start New Session</div>
+      <div class="form-grid">
+        <div class="fgroup">
+          <label>Course</label>
+          <select id="fCourse">${courses}</select>
+        </div>
+        <div class="fgroup">
+          <label>Section</label>
+          <select id="fSection">
+            <option value="BSE-243A">BSE-243A</option>
+            <option value="BSE-243B">BSE-243B</option>
+          </select>
+        </div>
+        <div class="fgroup form-full">
+          <label>Session Topic</label>
+          <input id="fTopic" placeholder="e.g. Requirements Elicitation Techniques">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="startSession()">▶ Start Attendance Session</button>
+    </div>
+    <div class="card" style="max-width:600px;margin-top:20px">
+      <div class="card-title">How It Works</div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        ${[
+          ['🟢','Start Session','Click above to generate a rotating QR code for this session.'],
+          ['📺','Display QR','Show the QR code on your projector. It rotates every 30 seconds.'],
+          ['📱','Students Scan','Students scan via their mobile browser — no app needed.'],
+          ['⏱','Opening & Closing','Opening window = first 10 min. Closing = last 10 min.'],
+          ['✅','Present / Late','Scanned both windows = Present. Only closing = Late.'],
+          ['🔒','Lock Session','Lock manually or it auto-locks after 20 minutes.'],
+        ].map(([ic,t,d])=>`
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <span style="font-size:20px">${ic}</span>
+            <div><div style="font-weight:600;font-size:13px">${t}</div><div style="font-size:12px;color:var(--muted);margin-top:2px">${d}</div></div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function liveSessionHTML() {
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <div>
+        <h2 style="font-size:18px;font-weight:700" id="sesTitle">Loading…</h2>
+        <div style="font-size:13px;color:var(--muted);margin-top:2px" id="sesMeta">—</div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <div id="windowPill" class="window-pill pill-opening pulse">● OPENING WINDOW</div>
+        <button class="btn btn-warning btn-sm" onclick="switchClosing()">Switch to Closing Window</button>
+        <button class="btn btn-danger btn-sm" onclick="lockSession()">🔒 Lock Session</button>
+      </div>
+    </div>
+
+    <div class="qr-area" id="qrArea">
+      <div class="qr-wrap" id="qrImgWrap">
+        <div style="color:#94a3b8;font-size:13px">Generating…</div>
+      </div>
+      <div class="qr-info">
+        <div style="font-size:11px;color:rgba(255,255,255,.4);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">Current Token</div>
+        <div class="qr-token" id="tokenDisp">——————</div>
+        <div class="timer-wrap">
+          <div class="timer-track"><div class="timer-fill" id="timerFill" style="width:100%"></div></div>
+          <div class="timer-num" id="timerNum">30s</div>
+        </div>
+        <div style="font-size:12px;color:rgba(255,255,255,.5);line-height:1.7">
+          Token rotates every <strong style="color:#fff">30 seconds</strong>.<br>
+          Expired tokens are instantly rejected.<br>
+          Students enter token or scan QR from mobile.
+        </div>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat"><div class="stat-val s-green" id="sPresent">0</div><div class="stat-lbl">Present</div></div>
+      <div class="stat"><div class="stat-val s-yellow" id="sLate">0</div><div class="stat-lbl">Late</div></div>
+      <div class="stat"><div class="stat-val s-red" id="sAbsent">0</div><div class="stat-lbl">Absent / Pending</div></div>
+    </div>
+
+    <div class="roster-wrap">
+      <div class="roster-head">
+        <div class="roster-label">Live Roster</div>
+        <button class="btn btn-outline btn-sm" onclick="pollSession()">↻ Refresh</button>
+      </div>
+      <table>
+        <thead><tr><th>Roll No.</th><th>Name</th><th>Status</th><th>Override</th></tr></thead>
+        <tbody id="rosterBody"><tr><td colspan="4" style="text-align:center;padding:28px;color:var(--muted)">Loading…</td></tr></tbody>
+      </table>
+    </div>`;
+}
+
+// ── Start session ─────────────────────────────────────────────────────────────
+async function startSession() {
+  const topic      = document.getElementById('fTopic').value.trim();
+  const courseCode = document.getElementById('fCourse').value;
+  const section    = document.getElementById('fSection').value;
+  if (!topic) { toast('⚠ Enter a session topic'); return; }
+
+  const r = await fetch('/api/faculty/start-session',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({topic,courseCode,section,facultyId:faculty.id,facultyName:faculty.name})
+  });
+  const d = await r.json();
+  if (!r.ok) { toast('Error: '+d.error,'err'); return; }
+
+  currentSesId = d.sessionId;
+  tokenExpiry  = d.expiresAt;
+  document.getElementById('pageContent').innerHTML = liveSessionHTML();
+  updateQR(d.qrCode, d.token);
+  startTimer();
+  startPoll();
+  toast('✓ Session started');
+}
+
+// ── Poll ──────────────────────────────────────────────────────────────────────
+function startPoll() {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(pollSession, 2000);
+}
+
+async function pollSession() {
+  if (!currentSesId) return;
+  const r = await fetch(`/api/faculty/session/${currentSesId}`);
+  if (!r.ok) return;
+  const d = await r.json();
+
+  // Token changed → update QR
+  const curTok = document.getElementById('tokenDisp')?.textContent;
+  if (d.token && d.token !== curTok) {
+    tokenExpiry = d.expiresAt;
+    updateQR(d.qrCode, d.token);
+  }
+
+  // Window badge
+  const pill = document.getElementById('windowPill');
+  if (pill) {
+    if (d.session.locked) {
+      pill.className = 'window-pill pill-locked'; pill.textContent = '🔒 LOCKED';
+      clearInterval(pollInterval); clearInterval(timerInterval);
+      document.getElementById('qrArea')?.remove();
+    } else if (d.session.status === 'closing') {
+      pill.className = 'window-pill pill-closing pulse'; pill.textContent = '● CLOSING WINDOW';
+    } else {
+      pill.className = 'window-pill pill-opening pulse'; pill.textContent = '● OPENING WINDOW';
+    }
+  }
+
+  // Title
+  const t = document.getElementById('sesTitle');
+  const m = document.getElementById('sesMeta');
+  if (t) t.textContent = d.session.topic;
+  if (m) m.textContent = `${d.session.courseCode} · ${d.session.section} · ${d.session.facultyName}`;
+
+  // Stats
+  ['sPresent','sLate','sAbsent'].forEach((id,i)=>{
+    const el = document.getElementById(id);
+    if (el) el.textContent = [d.presentCount,d.lateCount,d.absentCount][i];
+  });
+
+  // Roster
+  const tbody = document.getElementById('rosterBody');
+  if (tbody && d.roster) {
+    tbody.innerHTML = d.roster.map(s=>{
+      const st = s.status||'Absent';
+      let cls = 'sb-absent';
+      if (st.startsWith('Present'))       cls = 'sb-present';
+      else if (st === 'Late')             cls = 'sb-late';
+      else if (st === 'Opening Recorded') cls = 'sb-opening';
+      else if (st.includes('override'))   cls = 'sb-override';
+      return `<tr>
+        <td class="roll-mono">${s.rollNo}</td>
+        <td style="font-weight:500">${s.name}</td>
+        <td><span class="sbadge ${cls}">${st}</span></td>
+        <td><button class="btn btn-outline btn-sm" onclick="openOverride('${s.rollNo}','${s.name}')">Override</button></td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+function updateQR(qrCode, token) {
+  const w = document.getElementById('qrImgWrap');
+  const t = document.getElementById('tokenDisp');
+  if (w && qrCode) w.innerHTML = `<img src="${qrCode}" style="width:188px;height:188px">`;
+  if (t && token)  t.textContent = token;
+}
+
+// ── Timer bar ─────────────────────────────────────────────────────────────────
+function startTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(()=>{
+    if (!tokenExpiry) return;
+    const rem = Math.max(0, tokenExpiry - Date.now());
+    const pct = (rem / 30000) * 100;
+    const f   = document.getElementById('timerFill');
+    const n   = document.getElementById('timerNum');
+    if (f) { f.style.width = pct+'%'; f.style.background = pct>40?'#60a5fa':pct>15?'#f59e0b':'#f87171'; }
+    if (n) n.textContent = Math.ceil(rem/1000)+'s';
+  }, 200);
+}
+
+// ── Session controls ──────────────────────────────────────────────────────────
+async function switchClosing() {
+  if (!currentSesId) return;
+  await fetch(`/api/faculty/closing-window/${currentSesId}`,{method:'POST'});
+  toast('⏱ Switched to closing window');
+}
+
+async function lockSession() {
+  if (!currentSesId) return;
+  if (!confirm('Lock session? All remaining students will be marked Absent.')) return;
+  await fetch(`/api/faculty/lock-session/${currentSesId}`,{method:'POST'});
+  await pollSession();
+  currentSesId = null;
+  if (pollInterval)  clearInterval(pollInterval);
+  if (timerInterval) clearInterval(timerInterval);
+  setTimeout(()=>{ showPage('attendance'); toast('🔒 Session locked and saved'); }, 800);
+}
+
+// ── Override ──────────────────────────────────────────────────────────────────
+function openOverride(rollNo, name) {
+  document.getElementById('ovRollNo').value = rollNo;
+  document.getElementById('ovName').value   = name;
+  document.getElementById('ovReason').value = '';
+  document.getElementById('overrideOverlay').classList.add('show');
+}
+function closeModal() { document.getElementById('overrideOverlay').classList.remove('show'); }
+async function submitOverride() {
+  const rollNo  = document.getElementById('ovRollNo').value;
+  const status  = document.getElementById('ovStatus').value;
+  const reason  = document.getElementById('ovReason').value;
+  await fetch(`/api/faculty/override/${currentSesId}`,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({rollNo,status,reason})
+  });
+  closeModal();
+  await pollSession();
+  toast('✓ Override saved');
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function toast(msg, type) {
+  const el = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 2600);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+// Auto-login for demo (comment out for real auth)
+// doLogin();
+</script>
+</body>
+</html>
