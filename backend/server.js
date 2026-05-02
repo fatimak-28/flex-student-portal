@@ -403,26 +403,28 @@ app.patch('/api/faculty/session/:sessionId/meta', async (req, res) => {
 
     console.log('📝 Editing session metadata:', sessionId);
 
-    const session = store.sessions[sessionId];
-    if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
-    }
-
-    if (topic) session.topic = topic;
-    if (courseCode) session.courseCode = courseCode;
-    if (section) session.section = section;
-
-    // Also update in database
     try {
+        const dbCheck = await pool.query('SELECT session_id FROM sessions WHERE session_id = $1', [sessionId]);
+        if (dbCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Session not found in database' });
+        }
+
         await pool.query(
             'UPDATE sessions SET topic = $1, course_code = $2, section = $3 WHERE session_id = $4',
-            [session.topic, session.courseCode, session.section, sessionId]
+            [topic, courseCode, section, sessionId]
         );
+
+        if (store.sessions[sessionId]) {
+            if (topic) store.sessions[sessionId].topic = topic;
+            if (courseCode) store.sessions[sessionId].courseCode = courseCode;
+            if (section) store.sessions[sessionId].section = section;
+        }
+
+        res.json({ success: true, message: 'Metadata updated' });
     } catch (err) {
         console.error('DB update error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
     }
-
-    res.json({ success: true, message: 'Metadata updated' });
 });
 
 app.patch('/api/faculty/session/:sessionId/record', async (req, res) => {
@@ -431,22 +433,95 @@ app.patch('/api/faculty/session/:sessionId/record', async (req, res) => {
 
     console.log('📝 Updating student record:', sessionId, rollNo, '→', status);
 
-    const session = store.sessions[sessionId];
-    if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
-    }
-
-    // Update in database
     try {
-        await pool.query(
+        // Step 1: try to update the existing row
+        const updateResult = await pool.query(
             'UPDATE attendance_records SET status = $1 WHERE session_id = $2 AND roll_no = $3',
             [status, sessionId, rollNo]
         );
+
+        // Step 2: if no row existed yet, look up student and session separately then insert
+        if (updateResult.rowCount === 0) {
+            const studentRes = await pool.query(
+                'SELECT name, section FROM students WHERE roll_no = $1',
+                [rollNo]
+            );
+            const sessionRes = await pool.query(
+                'SELECT course_code, started_at FROM sessions WHERE session_id = $1',
+                [sessionId]
+            );
+
+            if (studentRes.rows.length === 0 || sessionRes.rows.length === 0) {
+                return res.status(404).json({ error: 'Student or session not found' });
+            }
+
+            const { name, section } = studentRes.rows[0];
+            const { course_code, started_at } = sessionRes.rows[0];
+
+            await pool.query(
+                'INSERT INTO attendance_records (session_id, roll_no, name, section, course_code, status, recorded_at) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (session_id, roll_no) DO UPDATE SET status = EXCLUDED.status',
+                [sessionId, rollNo, name, section, course_code, status, started_at]
+            );
+        }
+
+        res.json({ success: true, message: 'Record updated' });
     } catch (err) {
         console.error('DB update error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
+    }
+});
+
+
+// Batch update all attendance records for a session in one transactional request
+app.patch('/api/faculty/session/:sessionId/records-batch', async (req, res) => {
+    const { sessionId } = req.params;
+    const { records } = req.body;
+
+    if (!Array.isArray(records) || records.length === 0) {
+        return res.status(400).json({ error: 'records array is required' });
     }
 
-    res.json({ success: true, message: 'Record updated' });
+    console.log('Batch updating', records.length, 'records for session:', sessionId);
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        for (const { rollNo, status } of records) {
+            const updateResult = await client.query(
+                'UPDATE attendance_records SET status = $1 WHERE session_id = $2 AND roll_no = $3',
+                [status, sessionId, rollNo]
+            );
+
+            if (updateResult.rowCount === 0) {
+                const studentRes = await client.query(
+                    'SELECT name, section FROM students WHERE roll_no = $1',
+                    [rollNo]
+                );
+                const sessionRes = await client.query(
+                    'SELECT course_code, started_at FROM sessions WHERE session_id = $1',
+                    [sessionId]
+                );
+                if (studentRes.rows.length > 0 && sessionRes.rows.length > 0) {
+                    const { name, section } = studentRes.rows[0];
+                    const { course_code, started_at } = sessionRes.rows[0];
+                    await client.query(
+                        'INSERT INTO attendance_records (session_id, roll_no, name, section, course_code, status, recorded_at) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (session_id, roll_no) DO UPDATE SET status = EXCLUDED.status',
+                        [sessionId, rollNo, name, section, course_code, status, started_at]
+                    );
+                }
+            }
+        }
+
+        await client.query('COMMIT');
+        res.json({ success: true, updated: records.length });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Batch update error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
+    } finally {
+        client.release();
+    }
 });
 
 // ============ STUDENT ROUTES ============
@@ -570,7 +645,7 @@ app.get('/api/student/:rollNo/attendance', async (req, res) => {
 });
 
 // ============ START SERVER ============
-const PORT = 3000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', async () => {
     console.log('\n══════════════════════════════════════════');
     console.log('  FLEX Attendance System');

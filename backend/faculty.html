@@ -957,48 +957,48 @@
             if (page === 'dashboard') { renderDashboard(c); return; }
 
             c.innerHTML = `
-                <div class="coming-page">
-                    <div class="coming-icon">🔧</div>
-                    <div class="coming-title">${PAGE_TITLES[page] || page}</div>
-                    <div class="coming-sub">
-                        This module is part of the full FLEX system and will be available in a future release.<br><br>
-                        For now, the <strong>Attendance</strong> module is fully operational.
-                    </div>
-                </div>`;
+                    <div class="coming-page">
+                        <div class="coming-icon">🔧</div>
+                        <div class="coming-title">${PAGE_TITLES[page] || page}</div>
+                        <div class="coming-sub">
+                            This module is part of the full FLEX system and will be available in a future release.<br><br>
+                            For now, the <strong>Attendance</strong> module is fully operational.
+                        </div>
+                    </div>`;
         }
 
         // ── Dashboard ─────────────────────────────────────────────────────────────
         function renderDashboard(c) {
             c.innerHTML = `
-                <div style="margin-bottom:24px">
-                    <h2 style="font-size:22px;font-weight:700">Welcome, ${faculty?.name?.split(' ')[0]} 👋</h2>
-                    <p style="color:var(--muted);font-size:14px;margin-top:4px">
-                        ${new Date().toLocaleDateString('en-PK', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                    </p>
-                </div>
-                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px">
-                    ${['Attendance', 'Marks', 'Grading', 'Feedback'].map((m, i) => `
-                        <div class="card" style="cursor:pointer;${i === 0 ? 'border-color:var(--accent);' : ''}"
-                             onclick="showPage('${m.toLowerCase()}')">
-                            <div style="font-size:24px;margin-bottom:10px">${['✅', '📊', '🎯', '💬'][i]}</div>
-                            <div style="font-weight:600;font-size:15px">${m}</div>
-                            <div style="font-size:12px;color:var(--muted);margin-top:4px">
-                                ${i === 0 ? '<span style="color:var(--green);font-weight:600">● Live</span>' : 'Coming soon'}
-                            </div>
-                        </div>`).join('')}
-                </div>
-                <div class="card">
-                    <div class="card-title">My Courses</div>
-                    ${(faculty?.courses || []).map(c => `
-                        <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
-                            <div style="width:40px;height:40px;background:#eff6ff;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">📚</div>
-                            <div>
-                                <div style="font-weight:600;font-size:14px">${c}</div>
-                                <div style="font-size:12px;color:var(--muted)">BSE-243A · Spring 2026</div>
-                            </div>
-                            <button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="showPage('attendance')">Take Attendance</button>
-                        </div>`).join('')}
-                </div>`;
+                    <div style="margin-bottom:24px">
+                        <h2 style="font-size:22px;font-weight:700">Welcome, ${faculty?.name?.split(' ')[0]} 👋</h2>
+                        <p style="color:var(--muted);font-size:14px;margin-top:4px">
+                            ${new Date().toLocaleDateString('en-PK', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        </p>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px">
+                        ${['Attendance', 'Marks', 'Grading', 'Feedback'].map((m, i) => `
+                            <div class="card" style="cursor:pointer;${i === 0 ? 'border-color:var(--accent);' : ''}"
+                                 onclick="showPage('${m.toLowerCase()}')">
+                                <div style="font-size:24px;margin-bottom:10px">${['✅', '📊', '🎯', '💬'][i]}</div>
+                                <div style="font-weight:600;font-size:15px">${m}</div>
+                                <div style="font-size:12px;color:var(--muted);margin-top:4px">
+                                    ${i === 0 ? '<span style="color:var(--green);font-weight:600">● Live</span>' : 'Coming soon'}
+                                </div>
+                            </div>`).join('')}
+                    </div>
+                    <div class="card">
+                        <div class="card-title">My Courses</div>
+                        ${(faculty?.courses || []).map(c => `
+                            <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+                                <div style="width:40px;height:40px;background:#eff6ff;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">📚</div>
+                                <div>
+                                    <div style="font-weight:600;font-size:14px">${c}</div>
+                                    <div style="font-size:12px;color:var(--muted)">BSE-243A · Spring 2026</div>
+                                </div>
+                                <button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="showPage('attendance')">Take Attendance</button>
+                            </div>`).join('')}
+                    </div>`;
         }
 
         // ── Attendance Page ───────────────────────────────────────────────────────
@@ -1008,14 +1008,14 @@
                 startPoll();
             } else {
                 c.innerHTML = `
-                    <div class="tabs">
-                        <button class="tab-btn ${currentTab === 'new-session' ? 'active' : ''}" onclick="switchTab('new-session')">➕ New Session</button>
-                        <button class="tab-btn ${currentTab === 'past-records' ? 'active' : ''}" onclick="switchTab('past-records')">📋 Past Records</button>
-                    </div>
-                    <div id="newSessionTab"  class="tab-content ${currentTab === 'new-session' ? 'active' : ''}">${startSessionHTML()}</div>
-                    <div id="pastRecordsTab" class="tab-content ${currentTab === 'past-records' ? 'active' : ''}">
-                        <div id="pastRecordsContent">Loading...</div>
-                    </div>`;
+                        <div class="tabs">
+                            <button class="tab-btn ${currentTab === 'new-session' ? 'active' : ''}" onclick="switchTab('new-session')">➕ New Session</button>
+                            <button class="tab-btn ${currentTab === 'past-records' ? 'active' : ''}" onclick="switchTab('past-records')">📋 Past Records</button>
+                        </div>
+                        <div id="newSessionTab"  class="tab-content ${currentTab === 'new-session' ? 'active' : ''}">${startSessionHTML()}</div>
+                        <div id="pastRecordsTab" class="tab-content ${currentTab === 'past-records' ? 'active' : ''}">
+                            <div id="pastRecordsContent">Loading...</div>
+                        </div>`;
                 if (currentTab === 'past-records') { loadPastRecords(); }
             }
         }
@@ -1057,10 +1057,10 @@
 
                 if (!historyData || historyData.length === 0) {
                     container.innerHTML = `<div style="text-align:center;padding:40px">
-                <div style="font-size:56px;opacity:0.4">📋</div>
-                <div style="font-size:20px;font-weight:600;margin-top:16px">No History Yet</div>
-                <div style="font-size:14px;color:var(--muted);margin-top:8px">Locked sessions will appear here.<br>Run and lock a session to see records.</div>
-            </div>`;
+                    <div style="font-size:56px;opacity:0.4">📋</div>
+                    <div style="font-size:20px;font-weight:600;margin-top:16px">No History Yet</div>
+                    <div style="font-size:14px;color:var(--muted);margin-top:8px">Locked sessions will appear here.<br>Run and lock a session to see records.</div>
+                </div>`;
                     return;
                 }
 
@@ -1073,30 +1073,33 @@
                 const sections = [...new Set(historyData.map(s => s.section))];
 
                 container.innerHTML = `
-            <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
-                <div style="flex:1;min-width:150px">
-                    <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase">Filter by Date</label>
-                    <select id="historyDateFilter" onchange="applyHistoryFilters()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px">
-                        <option value="">All Dates</option>
-                        ${dates.map(d => `<option value="${d}">${new Date(d).toLocaleDateString('en-PK')}</option>`).join('')}
-                    </select>
+                <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+                    <button class="btn btn-outline btn-sm" onclick="loadPastRecords()" style="gap:6px">↻ Refresh</button>
                 </div>
-                <div style="flex:1;min-width:150px">
-                    <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase">Course</label>
-                    <select id="historyCourseFilter" onchange="applyHistoryFilters()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px">
-                        <option value="">All Courses</option>
-                        ${courses.map(c => `<option value="${c}">${c}</option>`).join('')}
-                    </select>
+                <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+                    <div style="flex:1;min-width:150px">
+                        <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase">Filter by Date</label>
+                        <select id="historyDateFilter" onchange="applyHistoryFilters()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px">
+                            <option value="">All Dates</option>
+                            ${dates.map(d => `<option value="${d}">${new Date(d).toLocaleDateString('en-PK')}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div style="flex:1;min-width:150px">
+                        <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase">Course</label>
+                        <select id="historyCourseFilter" onchange="applyHistoryFilters()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px">
+                            <option value="">All Courses</option>
+                            ${courses.map(c => `<option value="${c}">${c}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div style="flex:1;min-width:150px">
+                        <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase">Section</label>
+                        <select id="historySectionFilter" onchange="applyHistoryFilters()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px">
+                            <option value="">All Sections</option>
+                            ${sections.map(s => `<option value="${s}">${s}</option>`).join('')}
+                        </select>
+                    </div>
                 </div>
-                <div style="flex:1;min-width:150px">
-                    <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase">Section</label>
-                    <select id="historySectionFilter" onchange="applyHistoryFilters()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px">
-                        <option value="">All Sections</option>
-                        ${sections.map(s => `<option value="${s}">${s}</option>`).join('')}
-                    </select>
-                </div>
-            </div>
-            <div id="historyCardsContainer"></div>`;
+                <div id="historyCardsContainer"></div>`;
 
                 window.historyData = historyData;
                 applyHistoryFilters();
@@ -1106,28 +1109,21 @@
                 container.innerHTML = '<div style="padding:40px;color:var(--red)">Error loading history. Check server.</div>';
             }
         }
+        function toDateStr(ts) {
+            const n = Number(ts);
+            if (!n) return '1970-01-01';
+            return new Date(n).toISOString().split('T')[0];
+        }
+
 
         function applyHistoryFilters() {
             const dateFilter = document.getElementById('historyDateFilter')?.value || '';
             const courseFilter = document.getElementById('historyCourseFilter')?.value || '';
             const sectionFilter = document.getElementById('historySectionFilter')?.value || '';
-
-            let filtered = window.historyData || [];
-
-            if (dateFilter) {
-                filtered = filtered.filter(s => {
-                    const d = new Date(parseInt(s.startedAt));
-                    const dateStr = d.toISOString().split('T')[0];
-                    return dateStr === dateFilter;
-                });
-            }
-            if (courseFilter) {
-                filtered = filtered.filter(s => s.courseCode === courseFilter);
-            }
-            if (sectionFilter) {
-                filtered = filtered.filter(s => s.section === sectionFilter);
-            }
-
+            let filtered = (window.historyData || []).slice();
+            if (dateFilter) filtered = filtered.filter(s => toDateStr(s.startedAt) === dateFilter);
+            if (courseFilter) filtered = filtered.filter(s => s.courseCode === courseFilter);
+            if (sectionFilter) filtered = filtered.filter(s => s.section === sectionFilter);
             renderHistoryCards(filtered);
         }
 
@@ -1144,37 +1140,37 @@
 
             for (let i = 0; i < filtered.length; i++) {
                 const s = filtered[i];
-                const dt = new Date(parseInt(s.startedAt));
-                const dateStr = dt.toLocaleDateString('en-PK');
-                const timeStr = dt.toLocaleTimeString('en-PK');
+                const dt = new Date(Number(s.startedAt));
+                const dateStr = dt.toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' });
+                const timeStr = dt.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' });
                 const pct = s.total ? Math.round(((s.present + s.late) / s.total) * 100) : 0;
 
                 html += `<div style="background:white;border:1px solid #e2e8f0;border-radius:12px;padding:24px;margin-bottom:20px">
-            <div style="display:flex;justify-content:space-between;flex-wrap:wrap">
-                <div style="flex:1">
-                    <div style="font-size:16px;font-weight:700;margin-bottom:4px">${s.topic}</div>
-                    <div style="font-size:12px;color:#64748b;margin-bottom:12px">
-                        ${s.courseCode} · ${s.section} · ${dateStr}, ${timeStr}
+                <div style="display:flex;justify-content:space-between;flex-wrap:wrap">
+                    <div style="flex:1">
+                        <div style="font-size:16px;font-weight:700;margin-bottom:4px">${s.topic}</div>
+                        <div style="font-size:12px;color:#64748b;margin-bottom:12px">
+                            ${s.courseCode} · ${s.section} · ${dateStr}, ${timeStr}
+                        </div>
+                        <div style="display:flex;gap:16px;margin-bottom:16px">
+                            <span style="font-size:13px;color:#16a34a;font-weight:600">✅ ${s.present} Present</span>
+                            <span style="font-size:13px;color:#ca8a04;font-weight:600">⏰ ${s.late} Late</span>
+                            <span style="font-size:13px;color:#dc2626;font-weight:600">❌ ${s.absent} Absent</span>
+                            <span style="font-size:13px;color:#64748b">/ ${s.total} total</span>
+                        </div>
                     </div>
-                    <div style="display:flex;gap:16px;margin-bottom:16px">
-                        <span style="font-size:13px;color:#16a34a;font-weight:600">✅ ${s.present} Present</span>
-                        <span style="font-size:13px;color:#ca8a04;font-weight:600">⏰ ${s.late} Late</span>
-                        <span style="font-size:13px;color:#dc2626;font-weight:600">❌ ${s.absent} Absent</span>
-                        <span style="font-size:13px;color:#64748b">/ ${s.total} total</span>
-                    </div>
+                    <button class="btn btn-outline btn-sm" onclick="openEditModal('${s.sessionId}')" style="padding:6px 14px;border:1px solid #e2e8f0;border-radius:8px;background:white;cursor:pointer">✏ Edit</button>
                 </div>
-                <button class="btn btn-outline btn-sm" onclick="openEditModal('${s.sessionId}')" style="padding:6px 14px;border:1px solid #e2e8f0;border-radius:8px;background:white;cursor:pointer">✏ Edit</button>
-            </div>
-            <div style="margin-top:16px;border:1px solid #e2e8f0;border-radius:10px;overflow-x:auto">
-                <table style="width:100%;border-collapse:collapse">
-                    <thead>
-                        <tr style="background:#f8fafc">
-                            <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:600;color:#64748b">Roll No.</th>
-                            <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:600;color:#64748b">Name</th>
-                            <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:600;color:#64748b">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
+                <div style="margin-top:16px;border:1px solid #e2e8f0;border-radius:10px;overflow-x:auto">
+                    <table style="width:100%;border-collapse:collapse">
+                        <thead>
+                            <tr style="background:#f8fafc">
+                                <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:600;color:#64748b">Roll No.</th>
+                                <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:600;color:#64748b">Name</th>
+                                <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:600;color:#64748b">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
 
                 for (let j = 0; j < s.records.length; j++) {
                     const row = s.records[j];
@@ -1192,18 +1188,18 @@
                     }
 
                     html += `<tr>
-                <td style="padding:10px 16px;border-bottom:1px solid #f1f5f9;font-family:monospace;font-size:12px">${row.rollNo}</td>
-                <td style="padding:10px 16px;border-bottom:1px solid #f1f5f9;font-size:13px">${row.name}</td>
-                <td style="padding:10px 16px;border-bottom:1px solid #f1f5f9">
-                    <span style="display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;${statusStyle}">${statusText}</span>
-                </td>
-            </tr>`;
+                    <td style="padding:10px 16px;border-bottom:1px solid #f1f5f9;font-family:monospace;font-size:12px">${row.rollNo}</td>
+                    <td style="padding:10px 16px;border-bottom:1px solid #f1f5f9;font-size:13px">${row.name}</td>
+                    <td style="padding:10px 16px;border-bottom:1px solid #f1f5f9">
+                        <span style="display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;${statusStyle}">${statusText}</span>
+                    </td>
+                </tr>`;
                 }
 
                 html += `</tbody>
-                </table>
-            </div>
-        </div>`;
+                    </table>
+                </div>
+            </div>`;
             }
 
             container.innerHTML = html;
@@ -1214,35 +1210,35 @@
             const courses = (faculty?.courses || ['SE-2001']).map(c => `<option value="${c}">${c}</option>`).join('');
             const today = new Date().toISOString().split('T')[0];
             return `
-                <div class="card">
-                    <div class="card-title">Start New Session</div>
-                    <div class="form-grid">
-                        <div class="fgroup">
-                            <label>Course</label>
-                            <select id="fCourse">${courses}</select>
+                    <div class="card">
+                        <div class="card-title">Start New Session</div>
+                        <div class="form-grid">
+                            <div class="fgroup">
+                                <label>Course</label>
+                                <select id="fCourse">${courses}</select>
+                            </div>
+                            <div class="fgroup">
+                                <label>Section</label>
+                                <select id="fSection">
+                                    <option value="BSE-243A">BSE-243A</option>
+                                    <option value="BSE-243B">BSE-243B</option>
+                                </select>
+                            </div>
+                            <div class="fgroup">
+                                <label>Session Date</label>
+                                <input type="date" id="fDate" value="${today}">
+                            </div>
+                            <div class="fgroup form-full">
+                                <label>Session Topic</label>
+                                <input id="fTopic" placeholder="e.g. Requirements Elicitation Techniques">
+                            </div>
                         </div>
-                        <div class="fgroup">
-                            <label>Section</label>
-                            <select id="fSection">
-                                <option value="BSE-243A">BSE-243A</option>
-                                <option value="BSE-243B">BSE-243B</option>
-                            </select>
-                        </div>
-                        <div class="fgroup">
-                            <label>Session Date</label>
-                            <input type="date" id="fDate" value="${today}">
-                        </div>
-                        <div class="fgroup form-full">
-                            <label>Session Topic</label>
-                            <input id="fTopic" placeholder="e.g. Requirements Elicitation Techniques">
-                        </div>
+                        <button class="btn btn-primary" onclick="startSession()">▶ Start Attendance Session</button>
                     </div>
-                    <button class="btn btn-primary" onclick="startSession()">▶ Start Attendance Session</button>
-                </div>
-                <div class="card" style="margin-top:20px">
-                    <div class="card-title">How It Works</div>
-                    <div style="display:flex;flex-direction:column;gap:12px">
-                        ${[
+                    <div class="card" style="margin-top:20px">
+                        <div class="card-title">How It Works</div>
+                        <div style="display:flex;flex-direction:column;gap:12px">
+                            ${[
                     ['🟢', 'Start Session', 'Click above to generate a rotating QR code for this session.'],
                     ['📺', 'Display QR', 'Show the QR code on your projector. It rotates every 30 seconds.'],
                     ['📱', 'Students Scan', 'Students scan via their mobile browser — no app needed.'],
@@ -1250,70 +1246,70 @@
                     ['✅', 'Present / Late', 'Scanned both windows = Present. Only closing = Late.'],
                     ['🔒', 'Lock Session', 'Lock manually or it auto-locks after 20 minutes.']
                 ].map(([ic, t, d]) => `
-                            <div style="display:flex;gap:12px;align-items:flex-start">
-                                <span style="font-size:20px">${ic}</span>
-                                <div>
-                                    <div style="font-weight:600;font-size:13px">${t}</div>
-                                    <div style="font-size:12px;color:var(--muted);margin-top:2px">${d}</div>
-                                </div>
-                            </div>`).join('')}
-                    </div>
-                </div>`;
+                                <div style="display:flex;gap:12px;align-items:flex-start">
+                                    <span style="font-size:20px">${ic}</span>
+                                    <div>
+                                        <div style="font-weight:600;font-size:13px">${t}</div>
+                                        <div style="font-size:12px;color:var(--muted);margin-top:2px">${d}</div>
+                                    </div>
+                                </div>`).join('')}
+                        </div>
+                    </div>`;
         }
 
         // ── Live Session HTML ─────────────────────────────────────────────────────
         function liveSessionHTML() {
             return `
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
-                    <div>
-                        <h2 style="font-size:18px;font-weight:700" id="sesTitle">Loading…</h2>
-                        <div style="font-size:13px;color:var(--muted);margin-top:2px" id="sesMeta">—</div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                        <div>
+                            <h2 style="font-size:18px;font-weight:700" id="sesTitle">Loading…</h2>
+                            <div style="font-size:13px;color:var(--muted);margin-top:2px" id="sesMeta">—</div>
+                        </div>
+                        <div style="display:flex;gap:10px;align-items:center">
+                            <div id="windowPill" class="window-pill pill-opening pulse">● OPENING WINDOW</div>
+                            <button class="btn btn-warning btn-sm" onclick="switchClosing()">Switch to Closing Window</button>
+                            <button class="btn btn-danger btn-sm" onclick="lockSession()">🔒 Lock Session</button>
+                        </div>
                     </div>
-                    <div style="display:flex;gap:10px;align-items:center">
-                        <div id="windowPill" class="window-pill pill-opening pulse">● OPENING WINDOW</div>
-                        <button class="btn btn-warning btn-sm" onclick="switchClosing()">Switch to Closing Window</button>
-                        <button class="btn btn-danger btn-sm" onclick="lockSession()">🔒 Lock Session</button>
-                    </div>
-                </div>
-                <div class="qr-area" id="qrArea">
-                    <div class="qr-wrap" id="qrImgWrap">
-                        <div style="color:#94a3b8;font-size:13px">Generating…</div>
-                    </div>
-                    <div class="qr-info">
-                        <div style="font-size:11px;color:rgba(255,255,255,.4);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">Current Token</div>
-                        <div class="qr-token" id="tokenDisp">——————</div>
-                        <div class="timer-wrap">
-                            <div class="timer-track">
-                                <div class="timer-fill" id="timerFill" style="width:100%"></div>
+                    <div class="qr-area" id="qrArea">
+                        <div class="qr-wrap" id="qrImgWrap">
+                            <div style="color:#94a3b8;font-size:13px">Generating…</div>
+                        </div>
+                        <div class="qr-info">
+                            <div style="font-size:11px;color:rgba(255,255,255,.4);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">Current Token</div>
+                            <div class="qr-token" id="tokenDisp">——————</div>
+                            <div class="timer-wrap">
+                                <div class="timer-track">
+                                    <div class="timer-fill" id="timerFill" style="width:100%"></div>
+                                </div>
+                                <div class="timer-num" id="timerNum">30s</div>
                             </div>
-                            <div class="timer-num" id="timerNum">30s</div>
-                        </div>
-                        <div style="font-size:12px;color:rgba(255,255,255,.5);line-height:1.7">
-                            Token rotates every <strong style="color:#fff">30 seconds</strong>.<br>
-                            Expired tokens are instantly rejected.<br>
-                            Students enter token or scan QR from mobile.
+                            <div style="font-size:12px;color:rgba(255,255,255,.5);line-height:1.7">
+                                Token rotates every <strong style="color:#fff">30 seconds</strong>.<br>
+                                Expired tokens are instantly rejected.<br>
+                                Students enter token or scan QR from mobile.
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div class="stats-row">
-                    <div class="stat"><div class="stat-val s-green"  id="sPresent">0</div><div class="stat-lbl">Present</div></div>
-                    <div class="stat"><div class="stat-val s-yellow" id="sLate">0</div><div class="stat-lbl">Late</div></div>
-                    <div class="stat"><div class="stat-val s-red"    id="sAbsent">0</div><div class="stat-lbl">Absent / Pending</div></div>
-                </div>
-                <div class="roster-wrap">
-                    <div class="roster-head">
-                        <div class="roster-label">Live Roster</div>
-                        <button class="btn btn-outline btn-sm" onclick="pollSession()">↻ Refresh</button>
+                    <div class="stats-row">
+                        <div class="stat"><div class="stat-val s-green"  id="sPresent">0</div><div class="stat-lbl">Present</div></div>
+                        <div class="stat"><div class="stat-val s-yellow" id="sLate">0</div><div class="stat-lbl">Late</div></div>
+                        <div class="stat"><div class="stat-val s-red"    id="sAbsent">0</div><div class="stat-lbl">Absent / Pending</div></div>
                     </div>
-                    <table>
-                        <thead>
-                            <tr><th>Roll No.</th><th>Name</th><th>Status</th><th>Override</th></tr>
-                        </thead>
-                        <tbody id="rosterBody">
-                            <tr><td colspan="4" style="text-align:center;padding:28px;color:var(--muted)">Loading…</td></tr>
-                        </tbody>
-                    </table>
-                </div>`;
+                    <div class="roster-wrap">
+                        <div class="roster-head">
+                            <div class="roster-label">Live Roster</div>
+                            <button class="btn btn-outline btn-sm" onclick="pollSession()">↻ Refresh</button>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr><th>Roll No.</th><th>Name</th><th>Status</th><th>Override</th></tr>
+                            </thead>
+                            <tbody id="rosterBody">
+                                <tr><td colspan="4" style="text-align:center;padding:28px;color:var(--muted)">Loading…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>`;
         }
 
         // ── Session Controls ──────────────────────────────────────────────────────
@@ -1390,12 +1386,12 @@
                     else if (st === 'Opening Recorded') cls = 'sb-opening';
                     else if (st.includes('override')) cls = 'sb-override';
                     return `
-                    <tr>
-                        <td class="roll-mono">${s.rollNo}</td>
-                        <td style="font-weight:500">${s.name}</td>
-                        <td><span class="sbadge ${cls}">${st}</span></td>
-                        <td><button class="btn btn-outline btn-sm" onclick="openOverride('${s.rollNo}','${s.name}')">Override</button></td>
-                    </tr>`;
+                        <tr>
+                            <td class="roll-mono">${s.rollNo}</td>
+                            <td style="font-weight:500">${s.name}</td>
+                            <td><span class="sbadge ${cls}">${st}</span></td>
+                            <td><button class="btn btn-outline btn-sm" onclick="openOverride('${s.rollNo}','${s.name}')">Override</button></td>
+                        </tr>`;
                 }).join('');
             }
         }
@@ -1540,8 +1536,6 @@
                 return;
             }
 
-            console.log('Saving for session ID:', editSessionId);
-
             const topic = document.getElementById('editTopic').value.trim();
             const courseCode = document.getElementById('editCourse').value.trim();
             const section = document.getElementById('editSection').value.trim();
@@ -1551,52 +1545,69 @@
                 return;
             }
 
+            // Capture student statuses from DOM BEFORE closing modal
+            const selects = document.querySelectorAll('.edit-status-sel');
+            const studentStatuses = Array.from(selects).map(sel => ({
+                rollNo: sel.dataset.rollno,
+                status: sel.value
+            }));
+
+            // Snapshot session ID before closeEditModal() nulls it
+            const savedSessionId = editSessionId;
+
             toast('💾 Saving changes...');
 
             try {
-                // Save metadata
-                const metaResponse = await fetch(`/api/faculty/session/${editSessionId}/meta`, {
+                // 1. Save session metadata
+                const metaRes = await fetch(`/api/faculty/session/${savedSessionId}/meta`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ topic, courseCode, section })
                 });
-
-                if (!metaResponse.ok) {
-                    const error = await metaResponse.json();
-                    toast('❌ Failed to save: ' + (error.error || 'Unknown error'));
+                if (!metaRes.ok) {
+                    const err = await metaRes.json().catch(() => ({}));
+                    toast('❌ Meta save failed: ' + (err.error || metaRes.status));
                     return;
                 }
 
-                // Save individual student statuses
-                const selects = document.querySelectorAll('.edit-status-sel');
-                let successCount = 0;
+                // 2. Save all student statuses in one batch request
+                const batchRes = await fetch(`/api/faculty/session/${savedSessionId}/records-batch`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ records: studentStatuses })
+                });
+                if (!batchRes.ok) {
+                    const err = await batchRes.json().catch(() => ({}));
+                    toast('❌ Records save failed: ' + (err.error || batchRes.status));
+                    return;
+                }
 
-                for (const sel of selects) {
-                    const rollNo = sel.dataset.rollno;
-                    const status = sel.value;
+                // 3. Close modal and update in-memory data so cards refresh instantly
+                closeEditModal();
 
-                    const recordResponse = await fetch(`/api/faculty/session/${editSessionId}/record`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ rollNo, status })
-                    });
-
-                    if (recordResponse.ok) {
-                        successCount++;
+                if (window.historyData) {
+                    const idx = window.historyData.findIndex(s => s.sessionId === savedSessionId);
+                    if (idx !== -1) {
+                        window.historyData[idx].topic = topic;
+                        window.historyData[idx].courseCode = courseCode;
+                        window.historyData[idx].section = section;
+                        for (const { rollNo, status } of studentStatuses) {
+                            const rec = window.historyData[idx].records.find(r => r.rollNo === rollNo);
+                            if (rec) rec.status = status;
+                        }
+                        const recs = window.historyData[idx].records;
+                        window.historyData[idx].present = recs.filter(r => r.status === 'Present').length;
+                        window.historyData[idx].late = recs.filter(r => r.status === 'Late').length;
+                        window.historyData[idx].absent = recs.filter(r => r.status === 'Absent').length;
                     }
                 }
 
-                closeEditModal();
-                toast(`✓ Saved ${successCount} records successfully`);
-
-                // Refresh the history view
-                if (currentTab === 'past-records') {
-                    await loadPastRecords();
-                }
+                if (currentTab === 'past-records') applyHistoryFilters();
+                toast(`✓ Changes saved successfully`);
 
             } catch (error) {
                 console.error('Save error:', error);
-                toast('❌ Network error. Check if server is running.');
+                toast('❌ Network error: ' + error.message);
             }
         }
 
