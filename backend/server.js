@@ -127,7 +127,17 @@ async function initDatabase() {
     }
 }
 
-initDatabase();
+async function restoreActiveSessions() {
+    const client = await pool.connect();
+    try {
+        const res = await client.query('UPDATE sessions SET locked = true, status = $1 WHERE locked = false RETURNING session_id', ['locked']);
+        if (res.rowCount > 0) console.log(`🔒 ${res.rowCount} stale session(s) locked on restart.`);
+    } catch (err) {
+        console.error('Session restore error:', err);
+    } finally {
+        client.release();
+    }
+}
 
 // IN-MEMORY STORE
 const store = {
@@ -153,7 +163,6 @@ const store = {
     currentToken: {},
     scans: {},
     rotateIntervals: {},
-    attendanceHistory: {},
 };
 
 // UTILITY FUNCTIONS
@@ -178,7 +187,8 @@ async function lockSession(sessionId) {
         [true, 'locked', s.lockedAt, sessionId]
     );
 
-    const students = store.students.filter(st => st.section === s.section);
+    const studentsRes = await pool.query('SELECT * FROM students WHERE section = $1', [s.section]);
+    const students = studentsRes.rows.map(r => ({ rollNo: r.roll_no, name: r.name, section: r.section }));
     const scans = store.scans[sessionId] || {};
 
     for (const st of students) {
@@ -188,7 +198,7 @@ async function lockSession(sessionId) {
         if (scan) {
             if (scan.opening && scan.closing) finalStatus = 'Present';
             else if (scan.closing) finalStatus = 'Late';
-            else if (scan.opening) finalStatus = 'Present';
+            else if (scan.opening) finalStatus = 'Late';
         }
 
         const ov = (s.overrides || []).find(o => o.rollNo === st.rollNo);
@@ -205,10 +215,11 @@ async function lockSession(sessionId) {
     console.log(`🔒 Session ${sessionId} locked.`);
 }
 
-function rosterForSession(sessionId) {
+async function rosterForSession(sessionId) {
     const s = store.sessions[sessionId];
     const scans = store.scans[sessionId] || {};
-    const students = store.students.filter(st => st.section === s.section);
+    const studentsRes = await pool.query('SELECT * FROM students WHERE section = $1', [s.section]);
+    const students = studentsRes.rows.map(r => ({ rollNo: r.roll_no, name: r.name, section: r.section }));
 
     return students.map(st => {
         const scan = scans[st.rollNo];
@@ -230,40 +241,46 @@ function rosterForSession(sessionId) {
 // ============ FACULTY ROUTES ============
 
 app.post('/api/faculty/login', async (req, res) => {
-    const { id, pass } = req.body;
-    const dbRes = await pool.query('SELECT * FROM faculty WHERE id = $1 AND pass = $2', [id, pass]);
-    const f = dbRes.rows[0];
-
-    if (!f) return res.status(401).json({ error: 'Invalid credentials' });
-    res.json({ id: f.id, name: f.name, dept: f.dept, courses: f.courses });
+    try {
+        const { id, pass } = req.body;
+        const dbRes = await pool.query('SELECT * FROM faculty WHERE id = $1 AND pass = $2', [id, pass]);
+        const f = dbRes.rows[0];
+        if (!f) return res.status(401).json({ error: 'Invalid credentials' });
+        res.json({ id: f.id, name: f.name, dept: f.dept, courses: f.courses });
+    } catch (err) {
+        console.error('Faculty login error:', err);
+        res.status(500).json({ error: 'Server error. Please try again.' });
+    }
 });
 
 app.post('/api/faculty/start-session', async (req, res) => {
-    const { topic, courseCode, section, facultyId, facultyName } = req.body;
+    try {
+    const { topic, courseCode, section, facultyId, facultyName, sessionDate } = req.body;
     if (!topic || !courseCode || !section) {
         return res.status(400).json({ error: 'Missing fields' });
     }
 
     const sessionId = sesId();
     const tok = token8();
-    const now = Date.now();
+    const tokenNow = Date.now();
+    const startedAt = tokenNow;
 
     store.sessions[sessionId] = {
         sessionId, topic, courseCode, section, facultyId, facultyName,
-        startedAt: now, status: 'opening', locked: false, overrides: []
+        startedAt, status: 'opening', locked: false, overrides: []
     };
-    store.currentToken[sessionId] = { token: tok, generatedAt: now, expiresAt: now + 30000 };
+    store.currentToken[sessionId] = { token: tok, generatedAt: tokenNow, expiresAt: tokenNow + 30000 };
     store.scans[sessionId] = {};
 
     await pool.query(
         `INSERT INTO sessions (session_id, topic, course_code, section, faculty_id, faculty_name, started_at, locked, status)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [sessionId, topic, courseCode, section, facultyId, facultyName, now, false, 'opening']
+        [sessionId, topic, courseCode, section, facultyId, facultyName, startedAt, false, 'opening']
     );
     await pool.query(
         `INSERT INTO current_tokens (session_id, token, generated_at, expires_at)
          VALUES ($1, $2, $3, $4)`,
-        [sessionId, tok, now, now + 30000]
+        [sessionId, tok, tokenNow, tokenNow + 30000]
     );
 
     setTimeout(() => {
@@ -293,106 +310,118 @@ app.post('/api/faculty/start-session', async (req, res) => {
 
     const qrData = `${sessionId}|${tok}`;
     const qrImg = await QRCode.toDataURL(qrData, { width: 300, margin: 2 });
-    res.json({ sessionId, token: tok, qrCode: qrImg, expiresAt: now + 30000 });
+    res.json({ sessionId, token: tok, qrCode: qrImg, expiresAt: tokenNow + 30000 });
+    } catch (err) {
+        console.error('Start session error:', err);
+        res.status(500).json({ error: 'Server error. Please try again.' });
+    }
 });
 
 app.get('/api/faculty/session/:sessionId', async (req, res) => {
-    const { sessionId } = req.params;
-    const s = store.sessions[sessionId];
-    if (!s) return res.status(404).json({ error: 'Not found' });
+    try {
+        const { sessionId } = req.params;
+        const s = store.sessions[sessionId];
+        if (!s) return res.status(404).json({ error: 'Not found' });
 
-    const td = store.currentToken[sessionId];
-    const roster = rosterForSession(sessionId);
-    let qrCode = null;
+        const td = store.currentToken[sessionId];
+        const roster = await rosterForSession(sessionId);
+        let qrCode = null;
 
-    if (td && !s.locked) {
-        const qrData = `${sessionId}|${td.token}`;
-        qrCode = await QRCode.toDataURL(qrData, { width: 300, margin: 2 });
+        if (td && !s.locked) {
+            const qrData = `${sessionId}|${td.token}`;
+            qrCode = await QRCode.toDataURL(qrData, { width: 300, margin: 2 });
+        }
+
+        res.json({
+            session: s, token: td?.token, expiresAt: td?.expiresAt, serverTime: Date.now(),
+            qrCode, roster,
+            presentCount: roster.filter(r => r.status.startsWith('Present')).length,
+            lateCount: roster.filter(r => r.status === 'Late').length,
+            absentCount: roster.filter(r => r.status === 'Absent').length,
+        });
+    } catch (err) {
+        console.error('Poll session error:', err);
+        res.status(500).json({ error: 'Server error.' });
     }
-
-    res.json({
-        session: s, token: td?.token, expiresAt: td?.expiresAt, serverTime: Date.now(),
-        qrCode, roster,
-        presentCount: roster.filter(r => r.status.startsWith('Present')).length,
-        lateCount: roster.filter(r => r.status === 'Late').length,
-        absentCount: roster.filter(r => r.status === 'Absent').length,
-    });
 });
 
 app.post('/api/faculty/lock-session/:sessionId', async (req, res) => {
-    await lockSession(req.params.sessionId);
-    res.json({ success: true });
+    try {
+        await lockSession(req.params.sessionId);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Lock session error:', err);
+        res.status(500).json({ error: 'Server error.' });
+    }
 });
 
 app.post('/api/faculty/closing-window/:sessionId', async (req, res) => {
-    const s = store.sessions[req.params.sessionId];
-    if (s && !s.locked) {
-        s.status = 'closing';
-        await pool.query('UPDATE sessions SET status = $1 WHERE session_id = $2', ['closing', req.params.sessionId]);
+    try {
+        const s = store.sessions[req.params.sessionId];
+        if (s && !s.locked) {
+            s.status = 'closing';
+            await pool.query('UPDATE sessions SET status = $1 WHERE session_id = $2', ['closing', req.params.sessionId]);
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Closing window error:', err);
+        res.status(500).json({ error: 'Server error.' });
     }
-    res.json({ success: true });
 });
 
 app.post('/api/faculty/override/:sessionId', async (req, res) => {
-    const { rollNo, status, reason } = req.body;
-    const s = store.sessions[req.params.sessionId];
-    if (!s) return res.status(404).json({ error: 'Not found' });
-
-    s.overrides = (s.overrides || []).filter(o => o.rollNo !== rollNo);
-    s.overrides.push({ rollNo, status, reason, at: Date.now() });
-    await pool.query(
-        'UPDATE sessions SET overrides = $1 WHERE session_id = $2',
-        [JSON.stringify(s.overrides), req.params.sessionId]
-    );
-    res.json({ success: true });
+    try {
+        const { rollNo, status, reason } = req.body;
+        const s = store.sessions[req.params.sessionId];
+        if (!s) return res.status(404).json({ error: 'Not found' });
+        s.overrides = (s.overrides || []).filter(o => o.rollNo !== rollNo);
+        s.overrides.push({ rollNo, status, reason, at: Date.now() });
+        await pool.query(
+            'UPDATE sessions SET overrides = $1 WHERE session_id = $2',
+            [JSON.stringify(s.overrides), req.params.sessionId]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Override error:', err);
+        res.status(500).json({ error: 'Server error.' });
+    }
 });
 
 app.get('/api/faculty/history', async (req, res) => {
-    const { facultyId } = req.query;
+    try {
+        const { facultyId } = req.query;
+        const facRes = await pool.query('SELECT * FROM faculty WHERE id = $1', [facultyId]);
+        const fac = facRes.rows[0];
+        if (!fac) return res.status(404).json({ error: 'Faculty not found' });
 
-    const facRes = await pool.query('SELECT * FROM faculty WHERE id = $1', [facultyId]);
-    const fac = facRes.rows[0];
-    if (!fac) return res.status(404).json({ error: 'Faculty not found' });
-
-    const sessionsRes = await pool.query(
-        `SELECT * FROM sessions 
-         WHERE locked = true AND course_code = ANY($1::text[])
-         ORDER BY started_at DESC`,
-        [fac.courses]
-    );
-
-    const locked = [];
-    for (const s of sessionsRes.rows) {
-        const recordsRes = await pool.query(
-            'SELECT * FROM attendance_records WHERE session_id = $1',
-            [s.session_id]
+        const sessionsRes = await pool.query(
+            `SELECT * FROM sessions WHERE locked = true AND course_code = ANY($1::text[]) ORDER BY started_at DESC`,
+            [fac.courses]
         );
 
-        const records = recordsRes.rows.map(r => ({
-            rollNo: r.roll_no,
-            name: r.name,
-            section: r.section,
-            status: r.status,
-        }));
-
-        const present = records.filter(r => r.status === 'Present').length;
-        const late = records.filter(r => r.status === 'Late').length;
-        const absent = records.filter(r => r.status === 'Absent').length;
-
-        locked.push({
-            sessionId: s.session_id,
-            topic: s.topic,
-            courseCode: s.course_code,
-            section: s.section,
-            facultyName: s.faculty_name,
-            startedAt: s.started_at,
-            records,
-            present, late, absent,
-            total: records.length,
-        });
+        const locked = [];
+        for (const s of sessionsRes.rows) {
+            const recordsRes = await pool.query(
+                'SELECT * FROM attendance_records WHERE session_id = $1', [s.session_id]
+            );
+            const records = recordsRes.rows.map(r => ({
+                rollNo: r.roll_no, name: r.name, section: r.section, status: r.status,
+            }));
+            locked.push({
+                sessionId: s.session_id, topic: s.topic, courseCode: s.course_code,
+                section: s.section, facultyName: s.faculty_name, startedAt: s.started_at,
+                records,
+                present: records.filter(r => r.status === 'Present').length,
+                late: records.filter(r => r.status === 'Late').length,
+                absent: records.filter(r => r.status === 'Absent').length,
+                total: records.length,
+            });
+        }
+        res.json(locked);
+    } catch (err) {
+        console.error('History error:', err);
+        res.status(500).json({ error: 'Server error.' });
     }
-
-    res.json(locked);
 });
 
 // ============ EDIT ENDPOINTS ============
@@ -400,8 +429,6 @@ app.get('/api/faculty/history', async (req, res) => {
 app.patch('/api/faculty/session/:sessionId/meta', async (req, res) => {
     const { sessionId } = req.params;
     const { topic, courseCode, section } = req.body;
-
-    console.log('📝 Editing session metadata:', sessionId);
 
     try {
         const dbCheck = await pool.query('SELECT session_id FROM sessions WHERE session_id = $1', [sessionId]);
@@ -430,8 +457,6 @@ app.patch('/api/faculty/session/:sessionId/meta', async (req, res) => {
 app.patch('/api/faculty/session/:sessionId/record', async (req, res) => {
     const { sessionId } = req.params;
     const { rollNo, status } = req.body;
-
-    console.log('📝 Updating student record:', sessionId, rollNo, '→', status);
 
     try {
         // Step 1: try to update the existing row
@@ -481,8 +506,6 @@ app.patch('/api/faculty/session/:sessionId/records-batch', async (req, res) => {
         return res.status(400).json({ error: 'records array is required' });
     }
 
-    console.log('Batch updating', records.length, 'records for session:', sessionId);
-
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
@@ -527,19 +550,16 @@ app.patch('/api/faculty/session/:sessionId/records-batch', async (req, res) => {
 // ============ STUDENT ROUTES ============
 
 app.post('/api/student/login', async (req, res) => {
-    const { rollNo, pass } = req.body;
-    const dbRes = await pool.query('SELECT * FROM students WHERE roll_no = $1 AND pass = $2', [rollNo.toUpperCase(), pass]);
-    const student = dbRes.rows[0];
-
-    if (!student) {
-        return res.status(401).json({ error: 'Invalid roll number or password' });
+    try {
+        const { rollNo, pass } = req.body;
+        const dbRes = await pool.query('SELECT * FROM students WHERE roll_no = $1 AND pass = $2', [rollNo.toUpperCase(), pass]);
+        const student = dbRes.rows[0];
+        if (!student) return res.status(401).json({ error: 'Invalid roll number or password' });
+        res.json({ rollNo: student.roll_no, name: student.name, section: student.section });
+    } catch (err) {
+        console.error('Student login error:', err);
+        res.status(500).json({ error: 'Server error. Please try again.' });
     }
-
-    res.json({
-        rollNo: student.roll_no,
-        name: student.name,
-        section: student.section
-    });
 });
 
 app.get('/api/student/:rollNo', async (req, res) => {
@@ -554,9 +574,10 @@ app.get('/api/sessions', (req, res) => {
 });
 
 app.post('/api/student/scan', async (req, res) => {
+  try {
     const { rollNo, sessionId, token } = req.body;
-    const student = store.students.find(s => s.rollNo === rollNo);
-    if (!student) return res.status(404).json({ error: 'Roll number not found' });
+    const studentRes = await pool.query('SELECT * FROM students WHERE roll_no = $1', [rollNo]);
+    if (!studentRes.rows[0]) return res.status(404).json({ error: 'Roll number not found' });
 
     const s = store.sessions[sessionId];
     if (!s) return res.status(404).json({ error: 'Session not found' });
@@ -598,6 +619,12 @@ app.post('/api/student/scan', async (req, res) => {
             [sessionId, rollNo, !isClosing, isClosing, Date.now()]
         );
     } else {
+        if (!isClosing) {
+            return res.status(400).json({
+                error: 'Opening window already recorded. Scan again during the closing window.',
+                code: 'DUPLICATE_OPENING'
+            });
+        }
         store.scans[sessionId][rollNo].closing = true;
         store.scans[sessionId][rollNo].secondScanAt = Date.now();
         await pool.query(
@@ -619,32 +646,45 @@ app.post('/api/student/scan', async (req, res) => {
     };
 
     res.json({ success: true, currentStatus, message: messages[currentStatus], window: isClosing ? 'closing' : 'opening' });
+  } catch (err) {
+      console.error('Scan error:', err);
+      res.status(500).json({ error: 'Server error. Please try again.' });
+  }
 });
 
 app.get('/api/student/:rollNo/attendance', async (req, res) => {
-    const { rollNo } = req.params;
-    const { courseCode } = req.query;
+    try {
+        const { rollNo } = req.params;
+        const { courseCode } = req.query;
 
-    const dbRes = await pool.query(
-        'SELECT * FROM attendance_records WHERE roll_no = $1 AND course_code = $2 ORDER BY recorded_at DESC',
-        [rollNo, courseCode]
-    );
-    const records = dbRes.rows.map(r => ({
-        sessionId: r.session_id,
-        date: r.recorded_at,
-        status: r.status
-    }));
+        const dbRes = courseCode
+            ? await pool.query(
+                'SELECT * FROM attendance_records WHERE roll_no = $1 AND course_code = $2 ORDER BY recorded_at DESC',
+                [rollNo, courseCode])
+            : await pool.query(
+                'SELECT * FROM attendance_records WHERE roll_no = $1 ORDER BY recorded_at DESC',
+                [rollNo]);
 
-    const total = records.length;
-    const present = records.filter(r => r.status === 'Present').length;
-    const late = records.filter(r => r.status === 'Late').length;
-    const absent = records.filter(r => r.status === 'Absent').length;
-    const pct = total ? Math.round(((present + late) / total) * 100) : 0;
+        const records = dbRes.rows.map(r => ({
+            sessionId: r.session_id, date: r.recorded_at, status: r.status, courseCode: r.course_code
+        }));
 
-    res.json({ records, total, present, late, absent, pct });
+        const total = records.length;
+        const present = records.filter(r => r.status === 'Present').length;
+        const late = records.filter(r => r.status === 'Late').length;
+        const absent = records.filter(r => r.status === 'Absent').length;
+        const pct = total ? Math.round(((present + late) / total) * 100) : 0;
+
+        res.json({ records, total, present, late, absent, pct });
+    } catch (err) {
+        console.error('Attendance history error:', err);
+        res.status(500).json({ error: 'Server error.' });
+    }
 });
 
 // ============ START SERVER ============
+initDatabase().then(() => restoreActiveSessions());
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', async () => {
     console.log('\n══════════════════════════════════════════');
@@ -654,6 +694,4 @@ app.listen(PORT, '0.0.0.0', async () => {
     console.log(`  Faculty → http://localhost:${PORT}/faculty.html`);
     console.log(`  Student → http://localhost:${PORT}/student.html`);
     console.log('══════════════════════════════════════════\n');
-    console.log('Faculty IDs: FAC-001 / FAC-002   Password: admin');
-    console.log('Student roll nos: 24L-3083 etc.  Password: pass\n');
 });
