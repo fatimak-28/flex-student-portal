@@ -7,1067 +7,899 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #f4f6fb;
-            --sidebar: #1e2d4a;
-            --sidebar2: #243558;
-            --top: #fff;
-            --accent: #2563eb;
-            --accent2: #1d4ed8;
-            --green: #16a34a;
-            --yellow: #ca8a04;
-            --red: #dc2626;
-            --orange: #ea580c;
-            --text: #1e293b;
-            --muted: #64748b;
-            --border: #e2e8f0;
-            --card: #fff;
-            --radius: 12px;
-            --font: 'Inter', sans-serif;
-            --mono: 'JetBrains Mono', monospace;
+            --bg: #f4f6fb; --sidebar: #1e2d4a; --top: #fff;
+            --accent: #2563eb; --accent2: #1d4ed8;
+            --green: #16a34a; --yellow: #ca8a04; --red: #dc2626;
+            --text: #1e293b; --muted: #64748b; --border: #e2e8f0;
+            --card: #fff; --radius: 12px;
+            --font: 'Inter', sans-serif; --mono: 'JetBrains Mono', monospace;
         }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--font); background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+        /* ── Sidebar ── */
+        .sidebar { width: 240px; background: var(--sidebar); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+        .sidebar-brand { padding: 24px 20px 16px; border-bottom: 1px solid rgba(255,255,255,.08); }
+        .brand-logo { font-size: 22px; font-weight: 700; color: #fff; letter-spacing: 1px; }
+        .brand-sub { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 2px; }
+        .sidebar-user { padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,.08); }
+        .user-name { font-size: 13px; font-weight: 600; color: #fff; }
+        .user-role { font-size: 11px; color: rgba(255,255,255,.45); margin-top: 2px; }
+        .sidebar-nav { padding: 12px 0; flex: 1; }
+        .nav-section { padding: 8px 20px 4px; font-size: 10px; font-weight: 600; color: rgba(255,255,255,.3); letter-spacing: 1.5px; text-transform: uppercase; }
+        .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer; color: rgba(255,255,255,.65); font-size: 13px; font-weight: 500; transition: all .15s; border-left: 3px solid transparent; }
+        .nav-item:hover { background: rgba(255,255,255,.06); color: #fff; }
+        .nav-item.active { background: rgba(37,99,235,.25); color: #fff; border-left-color: var(--accent); }
+        .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+        .nav-item .coming { font-size: 9px; background: rgba(255,255,255,.12); color: rgba(255,255,255,.5); padding: 2px 6px; border-radius: 4px; margin-left: auto; }
+        .sidebar-logout { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,.08); }
+        .logout-btn { display: flex; align-items: center; gap: 8px; color: rgba(255,255,255,.5); font-size: 13px; cursor: pointer; padding: 8px 0; }
+        .logout-btn:hover { color: #fff; }
 
-        body {
-            font-family: var(--font);
-            background: var(--bg);
-            color: var(--text);
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-        }
+        /* ── Main ── */
+        .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .topbar { background: var(--top); border-bottom: 1px solid var(--border); padding: 0 28px; height: 56px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .topbar-title { font-size: 16px; font-weight: 600; }
+        .content { flex: 1; overflow-y: auto; padding: 28px; }
 
-        .sidebar {
-            width: 240px;
-            background: var(--sidebar);
-            display: flex;
-            flex-direction: column;
-            flex-shrink: 0;
-            overflow-y: auto;
-        }
+        /* ── Cards ── */
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+        .card + .card { margin-top: 20px; }
+        .card-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 16px; }
 
-        .sidebar-brand {
-            padding: 24px 20px 16px;
-            border-bottom: 1px solid rgba(255, 255, 255, .08);
-        }
+        /* ── Forms ── */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+        .form-full { grid-column: 1 / -1; }
+        .fgroup { display: flex; flex-direction: column; gap: 5px; }
+        label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+        input, select { padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-family: var(--font); font-size: 14px; color: var(--text); background: #fff; outline: none; transition: border-color .15s; }
+        input:focus, select:focus { border-color: var(--accent); }
+        input.err, select.err { border-color: var(--red); }
 
-        .brand-logo {
-            font-size: 22px;
-            font-weight: 700;
-            color: #fff;
-            letter-spacing: 1px;
-        }
+        /* ── Buttons ── */
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 8px; font-family: var(--font); font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all .15s; }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: var(--accent2); }
+        .btn-danger { background: var(--red); color: #fff; }
+        .btn-danger:hover { opacity: .85; }
+        .btn-outline { background: #fff; border: 1px solid var(--border); color: var(--text); }
+        .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-warning { background: #fef3c7; border: 1px solid #f59e0b; color: #92400e; }
+        .btn-warning:hover { background: #fde68a; }
+        .btn-success { background: #dcfce7; border: 1px solid #16a34a; color: #15803d; }
+        .btn-success:hover { background: #bbf7d0; }
+        .btn-sm { padding: 6px 14px; font-size: 12px; }
+        .btn:disabled { opacity: .45; cursor: not-allowed; }
 
-        .brand-sub {
-            font-size: 11px;
-            color: rgba(255, 255, 255, .4);
-            margin-top: 2px;
-        }
+        /* ── Login ── */
+        #loginScreen { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 999; }
+        .login-box { background: #fff; border: 1px solid var(--border); border-radius: 20px; padding: 40px; width: 390px; box-shadow: 0 20px 60px rgba(0,0,0,.08); }
+        .login-logo { font-size: 28px; font-weight: 800; color: var(--accent); letter-spacing: 2px; margin-bottom: 4px; }
+        .login-sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+        .login-error { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; display: none; }
+        .login-error.show { display: block; }
 
-        .sidebar-user {
-            padding: 16px 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, .08);
-        }
-
-        .user-name {
-            font-size: 13px;
-            font-weight: 600;
-            color: #fff;
-        }
-
-        .user-role {
-            font-size: 11px;
-            color: rgba(255, 255, 255, .45);
-            margin-top: 2px;
-        }
-
-        .sidebar-nav {
-            padding: 12px 0;
-            flex: 1;
-        }
-
-        .nav-section {
-            padding: 8px 20px 4px;
-            font-size: 10px;
-            font-weight: 600;
-            color: rgba(255, 255, 255, .3);
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
-        }
-
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 20px;
-            cursor: pointer;
-            color: rgba(255, 255, 255, .65);
-            font-size: 13px;
-            font-weight: 500;
-            transition: all .15s;
-            border-left: 3px solid transparent;
-        }
-
-            .nav-item:hover {
-                background: rgba(255, 255, 255, .06);
-                color: #fff;
-            }
-
-            .nav-item.active {
-                background: rgba(37, 99, 235, .25);
-                color: #fff;
-                border-left-color: var(--accent);
-            }
-
-            .nav-item .icon {
-                font-size: 16px;
-                width: 20px;
-                text-align: center;
-            }
-
-            .nav-item .coming {
-                font-size: 9px;
-                background: rgba(255, 255, 255, .12);
-                color: rgba(255, 255, 255, .5);
-                padding: 2px 6px;
-                border-radius: 4px;
-                margin-left: auto;
-            }
-
-        .sidebar-logout {
-            padding: 16px 20px;
-            border-top: 1px solid rgba(255, 255, 255, .08);
-        }
-
-        .logout-btn {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: rgba(255, 255, 255, .5);
-            font-size: 13px;
-            cursor: pointer;
-            padding: 8px 0;
-        }
-
-            .logout-btn:hover {
-                color: #fff;
-            }
-
-        .main {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .topbar {
-            background: var(--top);
-            border-bottom: 1px solid var(--border);
-            padding: 0 28px;
-            height: 56px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-shrink: 0;
-        }
-
-        .topbar-title {
-            font-size: 16px;
-            font-weight: 600;
-        }
-
-        .topbar-right {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .notif-btn {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 16px;
-        }
-
-        .content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 28px;
-        }
-
-        .card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 24px;
-        }
-
-            .card + .card {
-                margin-top: 20px;
-            }
-
-        .card-title {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: .8px;
-            margin-bottom: 16px;
-        }
-
-        .tabs {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 24px;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 12px;
-        }
-
-        .tab-btn {
-            background: none;
-            border: none;
-            padding: 8px 20px;
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--muted);
-            cursor: pointer;
-            border-radius: 8px;
-            transition: all .15s;
-        }
-
-            .tab-btn:hover {
-                background: var(--bg);
-                color: var(--text);
-            }
-
-            .tab-btn.active {
-                background: var(--accent);
-                color: white;
-            }
-
-        .tab-content {
-            display: none;
-        }
-
-            .tab-content.active {
-                display: block;
-            }
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 14px;
-            margin-bottom: 16px;
-        }
-
-        .form-full {
-            grid-column: 1 / -1;
-        }
-
-        .fgroup {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        label {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: .5px;
-        }
-
-        input,
-        select {
-            padding: 10px 14px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-family: var(--font);
-            font-size: 14px;
-            color: var(--text);
-            background: #fff;
-            outline: none;
-            transition: border-color .15s;
-        }
-
-            input:focus,
-            select:focus {
-                border-color: var(--accent);
-            }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-family: var(--font);
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-            transition: all .15s;
-        }
-
-        .btn-primary {
-            background: var(--accent);
-            color: #fff;
-        }
-
-            .btn-primary:hover {
-                background: var(--accent2);
-            }
-
-        .btn-danger {
-            background: var(--red);
-            color: #fff;
-        }
-
-            .btn-danger:hover {
-                opacity: .85;
-            }
-
-        .btn-outline {
-            background: #fff;
-            border: 1px solid var(--border);
-            color: var(--text);
-        }
-
-            .btn-outline:hover {
-                border-color: var(--accent);
-                color: var(--accent);
-            }
-
-        .btn-sm {
-            padding: 6px 14px;
-            font-size: 12px;
-        }
-
-        .btn-warning {
-            background: #fef3c7;
-            border: 1px solid #f59e0b;
-            color: #92400e;
-        }
-
-            .btn-warning:hover {
-                background: #fde68a;
-            }
-
-        .btn-success {
-            background: #dcfce7;
-            border: 1px solid #16a34a;
-            color: #15803d;
-        }
-
-            .btn-success:hover {
-                background: #bbf7d0;
-            }
-
-        .timer-display {
-            background: linear-gradient(135deg, #1e2d4a 0%, #243558 100%);
-            border-radius: 16px;
-            padding: 24px;
-            text-align: center;
-            margin-bottom: 20px;
-            color: white;
-        }
-
-        .timer-clock {
-            font-size: 64px;
-            font-family: var(--mono);
-            font-weight: 700;
-            letter-spacing: 5px;
-            margin: 10px 0;
-        }
-
-        .timer-label {
-            font-size: 14px;
-            opacity: 0.8;
-            text-transform: uppercase;
-            letter-spacing: 3px;
-        }
-
+        /* ── QR / Session Area ── */
         .qr-area {
             background: linear-gradient(135deg, #1e2d4a 0%, #243558 100%);
-            border-radius: 16px;
-            padding: 32px;
-            display: flex;
-            gap: 36px;
-            align-items: center;
-            margin-bottom: 24px;
-            color: #fff;
+            border-radius: 16px; padding: 28px 32px; display: flex; gap: 32px;
+            align-items: center; margin-bottom: 24px; color: #fff;
         }
-
         .qr-wrap {
-            background: #fff;
-            padding: 16px;
-            border-radius: 12px;
-            flex-shrink: 0;
-            width: 220px;
-            height: 220px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            background: #fff; padding: 14px; border-radius: 12px;
+            flex-shrink: 0; width: 216px; height: 216px;
+            display: flex; align-items: center; justify-content: center;
         }
-
-            .qr-wrap img {
-                width: 188px;
-                height: 188px;
-            }
-
-        .qr-info {
-            flex: 1;
-        }
-
+        .qr-wrap img { width: 188px; height: 188px; }
+        .qr-info { flex: 1; min-width: 0; }
+        .qr-token-label { font-size: 11px; color: rgba(255,255,255,.5); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
         .qr-token {
-            font-family: var(--mono);
-            font-size: 38px;
-            font-weight: 700;
-            letter-spacing: 10px;
-            color: #60a5fa;
-            margin: 8px 0 16px;
+            font-family: var(--mono); font-size: 26px; font-weight: 700;
+            letter-spacing: 6px; color: #60a5fa;
+            background: rgba(96,165,250,.12); border: 1px solid rgba(96,165,250,.3);
+            border-radius: 8px; padding: 10px 14px;
+            max-width: 100%; overflow: hidden; word-break: break-all;
+            margin-bottom: 14px;
         }
-
-        .stats-row {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-            margin-bottom: 24px;
+        .session-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 5px 14px; border-radius: 99px; font-size: 12px; font-weight: 700; letter-spacing: .5px;
+            margin-bottom: 14px;
         }
+        .badge-opening  { background: rgba(96,165,250,.2); border: 1px solid rgba(96,165,250,.4); color: #93c5fd; }
+        .badge-locked-o { background: rgba(248,113,113,.2); border: 1px solid rgba(248,113,113,.4); color: #fca5a5; }
+        .badge-closing  { background: rgba(251,146,60,.2);  border: 1px solid rgba(251,146,60,.4);  color: #fdba74; }
+        .badge-locked   { background: rgba(148,163,184,.2); border: 1px solid rgba(148,163,184,.4); color: #cbd5e1; }
+        .pulse { animation: pulse 1.4s ease-in-out infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
 
-        .stat {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 20px 24px;
+        /* Countdown bar */
+        .countdown-wrap { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+        .countdown-track { flex: 1; height: 6px; background: rgba(255,255,255,.15); border-radius: 99px; overflow: hidden; }
+        .countdown-fill  { height: 100%; border-radius: 99px; transition: width .4s linear, background .4s; }
+        .countdown-num   { font-family: var(--mono); font-size: 13px; color: rgba(255,255,255,.7); width: 36px; text-align: right; flex-shrink: 0; }
+
+        /* ── Session timer block ── */
+        .window-timer {
+            background: linear-gradient(135deg, #1e2d4a 0%, #243558 100%);
+            border-radius: 14px; padding: 20px 24px; margin-bottom: 18px; color: #fff;
+            display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;
         }
+        .window-clock { font-family: var(--mono); font-size: 48px; font-weight: 700; letter-spacing: 3px; }
+        .window-info { flex: 1; }
+        .window-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,.5); margin-bottom: 4px; }
+        .window-desc  { font-size: 13px; color: rgba(255,255,255,.75); }
 
-        .stat-val {
-            font-size: 42px;
-            font-weight: 700;
-            font-family: var(--mono);
-            line-height: 1;
-        }
+        /* ── Action button row ── */
+        .action-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
 
-        .stat-lbl {
-            font-size: 11px;
-            color: var(--muted);
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: .6px;
-            margin-top: 4px;
-        }
+        /* ── Stats ── */
+        .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+        .stat { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 22px; }
+        .stat-val { font-size: 40px; font-weight: 700; font-family: var(--mono); line-height: 1; }
+        .stat-lbl { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .6px; margin-top: 4px; }
+        .s-green { color: var(--green); } .s-yellow { color: var(--yellow); } .s-red { color: var(--red); }
 
-        .s-green { color: var(--green); }
-        .s-yellow { color: var(--yellow); }
-        .s-red { color: var(--red); }
-
-        .roster-wrap {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            overflow: hidden;
-        }
-
-        .roster-head {
-            padding: 14px 20px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .roster-label {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: .6px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th {
-            text-align: left;
-            padding: 10px 20px;
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: .6px;
-            background: #f8fafc;
-            border-bottom: 1px solid var(--border);
-        }
-
-        td {
-            padding: 12px 20px;
-            border-bottom: 1px solid #f1f5f9;
-            font-size: 13px;
-        }
-
-        .roll-mono {
-            font-family: var(--mono);
-            font-size: 12px;
-            color: var(--muted);
-        }
-
-        .sbadge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 3px 10px;
-            border-radius: 6px;
-            font-size: 11px;
-            font-weight: 700;
-        }
-
+        /* ── Roster ── */
+        .roster-wrap { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+        .roster-head { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+        .roster-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 10px 20px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; background: #f8fafc; border-bottom: 1px solid var(--border); }
+        td { padding: 11px 20px; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #fafbfc; }
+        .roll-mono { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+        .sbadge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; }
         .sb-present { background: #dcfce7; color: #15803d; }
-        .sb-late { background: #fef9c3; color: #854d0e; }
-        .sb-absent { background: #fee2e2; color: #b91c1c; }
+        .sb-late    { background: #fef9c3; color: #854d0e; }
+        .sb-absent  { background: #fee2e2; color: #b91c1c; }
         .sb-opening { background: #dbeafe; color: #1d4ed8; }
+        .sb-override{ background: #fef3c7; color: #92400e; }
 
-        .overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, .35);
-            backdrop-filter: blur(3px);
-            z-index: 100;
-            align-items: center;
-            justify-content: center;
-        }
+        /* ── Modals ── */
+        .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); backdrop-filter: blur(3px); z-index: 100; align-items: center; justify-content: center; }
+        .overlay.show { display: flex; }
+        .modal { background: #fff; border-radius: 16px; padding: 28px; width: 420px; max-width: 94vw; box-shadow: 0 20px 60px rgba(0,0,0,.15); }
+        .modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 20px; }
+        .modal .fgroup { margin-bottom: 14px; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
 
-            .overlay.show {
-                display: flex;
-            }
-
-        .modal {
-            background: #fff;
-            border-radius: 16px;
-            padding: 28px;
-            width: 400px;
-            max-width: 92vw;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, .15);
-        }
-
-        .modal-actions {
-            display: flex;
-            gap: 10px;
-            justify-content: flex-end;
-            margin-top: 20px;
-        }
-
-        .toast {
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            background: #1e293b;
-            color: #fff;
-            padding: 12px 20px;
-            border-radius: 10px;
-            font-size: 13px;
-            font-weight: 500;
-            transform: translateY(80px);
-            transition: transform .3s;
-            z-index: 200;
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
+        /* ── Toast ── */
+        .toast { position: fixed; bottom: 24px; right: 24px; background: #1e293b; color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 500; transform: translateY(80px); transition: transform .3s; z-index: 200; display: flex; gap: 8px; align-items: center; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
         .toast.show { transform: translateY(0); }
+        .toast.toast-err { background: #b91c1c; }
 
-        #loginScreen {
-            position: fixed;
-            inset: 0;
-            background: var(--bg);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 999;
-        }
+        /* ── History ── */
+        .hist-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 22px 24px; margin-bottom: 18px; }
+        .hist-card:last-child { margin-bottom: 0; }
 
-        .login-box {
-            background: #fff;
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 40px;
-            width: 380px;
-        }
+        /* ── Tabs ── */
+        .tabs { display: flex; gap: 8px; margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+        .tab-btn { background: none; border: none; padding: 8px 20px; font-size: 14px; font-weight: 600; color: var(--muted); cursor: pointer; border-radius: 8px; transition: all .15s; }
+        .tab-btn:hover { background: var(--bg); color: var(--text); }
+        .tab-btn.active { background: var(--accent); color: white; }
 
-        .login-logo {
-            font-size: 28px;
-            font-weight: 800;
-            color: var(--accent);
-            letter-spacing: 2px;
-            margin-bottom: 4px;
-        }
+        /* ── Locked state ── */
+        .locked-banner { background: linear-gradient(135deg, #1e293b, #334155); border-radius: 14px; padding: 32px; text-align: center; color: #fff; margin-bottom: 24px; }
+        .locked-icon { font-size: 52px; margin-bottom: 12px; }
 
-        .login-sub {
-            font-size: 13px;
-            color: var(--muted);
-            margin-bottom: 28px;
-        }
-
-        .action-buttons {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
+        /* ── Resume banner ── */
+        .resume-banner { background: #eff6ff; border: 1px solid #93c5fd; border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+        .resume-info h4 { font-size: 15px; font-weight: 700; color: #1d4ed8; margin-bottom: 4px; }
+        .resume-info p  { font-size: 12px; color: var(--muted); }
     </style>
 </head>
 <body>
 
-    <div id="loginScreen">
-        <div class="login-box">
-            <div class="login-logo">FLEX</div>
-            <div class="login-sub">Faculty Portal · FAST-NUCES Lahore</div>
-            <div class="fgroup" style="margin-bottom:12px">
-                <label>Faculty ID</label>
-                <input id="loginId" placeholder="FAC-001">
-            </div>
-            <div class="fgroup" style="margin-bottom:20px">
-                <label>Password</label>
-                <input id="loginPass" type="password" placeholder="••••••">
-            </div>
-            <button class="btn btn-primary" style="width:100%" onclick="doLogin()">Sign In →</button>
+<!-- ══════════════════════════════════════════════════════════ LOGIN SCREEN -->
+<div id="loginScreen">
+    <div class="login-box">
+        <div class="login-logo">FLEX</div>
+        <div class="login-sub">Faculty Portal · FAST-NUCES Lahore</div>
+        <div class="login-error" id="loginError"></div>
+        <div class="fgroup" style="margin-bottom:12px">
+            <label>Faculty ID</label>
+            <input id="loginId" placeholder="FAC-001" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <div class="fgroup" style="margin-bottom:20px">
+            <label>Password</label>
+            <input id="loginPass" type="password" placeholder="••••••" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <button class="btn btn-primary" style="width:100%" id="loginBtn" onclick="doLogin()">Sign In →</button>
+        <div style="font-size:12px;color:var(--muted);margin-top:14px;text-align:center">Enter your Faculty ID and password</div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ SIDEBAR -->
+<nav class="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-logo">FLEX</div>
+        <div class="brand-sub">Faculty Portal</div>
+    </div>
+    <div class="sidebar-user">
+        <div class="user-name" id="sidebarName">—</div>
+        <div class="user-role" id="sidebarRole">Faculty</div>
+    </div>
+    <div class="sidebar-nav">
+        <div class="nav-section">Academic</div>
+        <div class="nav-item active" id="navAttendance" onclick="showPage('attendance')"><span class="icon">✅</span>Attendance</div>
+        <div class="nav-item" onclick="showPage('marks')"><span class="icon">📊</span>Marks<span class="coming">Soon</span></div>
+        <div class="nav-item" onclick="showPage('grading')"><span class="icon">🎯</span>Grading<span class="coming">Soon</span></div>
+        <div class="nav-section">Reports</div>
+        <div class="nav-item" id="navHistory" onclick="showPage('history')"><span class="icon">📋</span>History</div>
+    </div>
+    <div class="sidebar-logout">
+        <div class="logout-btn" onclick="doLogout()"><span>⬅</span> Sign Out</div>
+    </div>
+</nav>
+
+<!-- ════════════════════════════════════════════════════════════════ MAIN -->
+<div class="main">
+    <div class="topbar">
+        <div class="topbar-title" id="topbarTitle">Attendance Management</div>
+        <div style="font-size:13px;color:var(--muted)" id="topbarUser">—</div>
+    </div>
+    <div class="content" id="pageContent"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════ OVERRIDE MODAL -->
+<div class="overlay" id="overrideOverlay">
+    <div class="modal">
+        <h3>Manual Override</h3>
+        <input type="hidden" id="ovRollNo">
+        <div class="fgroup">
+            <label>Student</label>
+            <input id="ovName" disabled>
+        </div>
+        <div class="fgroup">
+            <label>Set Status</label>
+            <select id="ovStatus">
+                <option value="Present">Present</option>
+                <option value="Late">Late</option>
+                <option value="Absent">Absent</option>
+            </select>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="submitOverride()">Save</button>
         </div>
     </div>
+</div>
 
-    <nav class="sidebar">
-        <div class="sidebar-brand">
-            <div class="brand-logo">FLEX</div>
-            <div class="brand-sub">Faculty Portal</div>
-        </div>
-        <div class="sidebar-user">
-            <div class="user-name" id="sidebarName">—</div>
-            <div class="user-role" id="sidebarRole">Faculty</div>
-        </div>
-        <div class="sidebar-nav">
-            <div class="nav-section">Academic</div>
-            <div class="nav-item active" onclick="showPage('attendance')"><span class="icon">✅</span>Attendance</div>
-            <div class="nav-item" onclick="showPage('marks')"><span class="icon">📊</span>Marks<span class="coming">Soon</span></div>
-            <div class="nav-item" onclick="showPage('grading')"><span class="icon">🎯</span>Grading<span class="coming">Soon</span></div>
-            <div class="nav-section">Reports</div>
-            <div class="nav-item" onclick="showPage('history')"><span class="icon">📋</span>History</div>
-        </div>
-        <div class="sidebar-logout">
-            <div class="logout-btn" onclick="doLogout()"><span>⬅</span> Sign Out</div>
-        </div>
-    </nav>
+<!-- ════════════════════════════════════════════════════════════ TOAST -->
+<div class="toast" id="toast"></div>
 
-    <div class="main">
-        <div class="topbar">
-            <div class="topbar-title" id="topbarTitle">Attendance Management</div>
-            <div class="topbar-right">
-                <div style="font-size:13px;color:var(--muted)" id="topbarUser">—</div>
-            </div>
-        </div>
-        <div class="content" id="pageContent"></div>
-    </div>
+<script>
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let faculty = null;
+let currentSession = null;   // { sessionId, topic, courseCode, section, status, ... }
+let pollInterval   = null;
+let tokenExpiry    = null;
+let windowTimer    = null;   // countdown interval for opening/closing 10-min window
+let windowEndTime  = null;
 
-    <div class="overlay" id="overrideOverlay">
-        <div class="modal">
-            <h3>Manual Override</h3>
-            <input type="hidden" id="ovRollNo">
-            <div class="fgroup">
-                <label>Student</label>
-                <input id="ovName" disabled>
-            </div>
-            <div class="fgroup">
-                <label>Set Status</label>
-                <select id="ovStatus">
-                    <option value="Present">Present</option>
-                    <option value="Late">Late</option>
-                    <option value="Absent">Absent</option>
-                </select>
-            </div>
-            <div class="modal-actions">
-                <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="submitOverride()">Save</button>
-            </div>
-        </div>
-    </div>
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+function toast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (type === 'err' ? ' toast-err' : '');
+    clearTimeout(t._t);
+    t._t = setTimeout(() => t.classList.remove('show'), 3200);
+}
 
-    <div class="toast" id="toast">✓ Success</div>
+// ── LOGIN / LOGOUT ────────────────────────────────────────────────────────────
+async function doLogin() {
+    const id   = document.getElementById('loginId').value.trim();
+    const pass = document.getElementById('loginPass').value;
+    const errEl = document.getElementById('loginError');
+    errEl.classList.remove('show');
 
-    <script>
-        let faculty = null;
-        let currentSession = null;
-        let timerInterval = null;
-        let pollInterval = null;
-        let tokenExpiry = null;
+    if (!id)   { showLoginErr('Please enter your Faculty ID'); return; }
+    if (!pass) { showLoginErr('Please enter your password'); return; }
 
-        async function doLogin() {
-            const id = document.getElementById('loginId').value.trim();
-            const pass = document.getElementById('loginPass').value.trim();
-            const r = await fetch('/api/faculty/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id, pass })
-            });
-            if (!r.ok) { toast('❌ Invalid credentials'); return; }
-            faculty = await r.json();
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('sidebarName').textContent = faculty.name;
-            document.getElementById('sidebarRole').textContent = faculty.dept + ' Dept.';
-            document.getElementById('topbarUser').textContent = faculty.name;
-            showPage('attendance');
+    const btn = document.getElementById('loginBtn');
+    btn.textContent = 'Signing in…'; btn.disabled = true;
+
+    try {
+        const r = await fetch('/api/faculty/login', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, pass })
+        });
+        const data = await r.json();
+        if (!r.ok) { showLoginErr(data.error || 'Incorrect Faculty ID or password'); btn.textContent = 'Sign In →'; btn.disabled = false; return; }
+
+        faculty = data;
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('sidebarName').textContent = faculty.name;
+        document.getElementById('sidebarRole').textContent = (faculty.dept || '') + ' Dept.';
+        document.getElementById('topbarUser').textContent = faculty.name;
+
+        // Restore active session if any
+        if (faculty.activeSession) {
+            currentSession = faculty.activeSession;
         }
 
-        function doLogout() {
-            faculty = null;
-            if (timerInterval) clearInterval(timerInterval);
-            if (pollInterval) clearInterval(pollInterval);
-            document.getElementById('loginScreen').style.display = 'flex';
-        }
+        showPage('attendance');
+    } catch (e) {
+        showLoginErr('Connection error. Please try again.');
+    }
+    btn.textContent = 'Sign In →'; btn.disabled = false;
+}
 
-        function showPage(page) {
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            if (event && event.currentTarget) event.currentTarget.classList.add('active');
-            document.getElementById('topbarTitle').textContent = page === 'attendance' ? 'Attendance Management' : 'Session History';
-            const c = document.getElementById('pageContent');
-            
-            if (page === 'attendance') {
-                if (currentSession && !currentSession.locked) {
-                    renderLiveSession(c);
-                } else {
-                    renderStartSession(c);
-                }
-            } else if (page === 'history') {
-                renderHistory(c);
+function showLoginErr(msg) {
+    const el = document.getElementById('loginError');
+    el.textContent = '⚠ ' + msg;
+    el.classList.add('show');
+}
+
+function doLogout() {
+    faculty = null; currentSession = null;
+    stopPolling(); stopWindowTimer();
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('loginError').classList.remove('show');
+    document.getElementById('loginId').value = '';
+    document.getElementById('loginPass').value = '';
+}
+
+// ── PAGE ROUTER ───────────────────────────────────────────────────────────────
+function showPage(page) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    if (page === 'attendance') document.getElementById('navAttendance').classList.add('active');
+    if (page === 'history')    document.getElementById('navHistory').classList.add('active');
+
+    document.getElementById('topbarTitle').textContent =
+        page === 'attendance' ? 'Attendance Management' :
+        page === 'history'    ? 'Session History' : page;
+
+    const c = document.getElementById('pageContent');
+    if (page === 'attendance') renderAttendancePage(c);
+    else if (page === 'history') renderHistoryPage(c);
+    else c.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;color:var(--muted)"><div style="font-size:52px;opacity:.3">🔧</div><div style="font-size:18px;font-weight:600;color:var(--text)">Coming Soon</div></div>`;
+}
+
+// ── ATTENDANCE PAGE ───────────────────────────────────────────────────────────
+function renderAttendancePage(c) {
+    stopPolling();
+    if (currentSession && !currentSession.locked) {
+        renderLiveSession(c);
+    } else {
+        renderStartSession(c);
+    }
+}
+
+function renderStartSession(c) {
+    const courses = (faculty?.courses || ['SE-2001']).map(cv => `<option value="${cv}">${cv}</option>`).join('');
+    const today = new Date().toISOString().split('T')[0];
+    c.innerHTML = `
+        <div class="card">
+            <div class="card-title">Start New Attendance Session</div>
+            <div class="form-grid">
+                <div class="fgroup">
+                    <label>Course</label>
+                    <select id="fCourse">${courses}</select>
+                </div>
+                <div class="fgroup">
+                    <label>Section</label>
+                    <select id="fSection">
+                        <option value="BSE-243A">BSE-243A</option>
+                        <option value="BSE-243B">BSE-243B</option>
+                    </select>
+                </div>
+                <div class="fgroup">
+                    <label>Session Date</label>
+                    <input type="date" id="fDate" value="${today}">
+                </div>
+                <div class="fgroup form-full">
+                    <label>Session Topic</label>
+                    <input id="fTopic" placeholder="e.g. Requirements Elicitation Techniques">
+                </div>
+            </div>
+            <div id="startErr" style="color:var(--red);font-size:13px;margin-bottom:10px;display:none"></div>
+            <button class="btn btn-primary" onclick="startOpeningSession()">▶ Start Opening Window (10 min)</button>
+        </div>
+        <div class="card">
+            <div class="card-title">Two-Session Attendance Flow</div>
+            <div style="display:flex;flex-direction:column;gap:12px">
+                ${[
+                    ['🟢','Start Opening Window','Students scan the QR code. They are recorded as "Opening Recorded".'],
+                    ['🔒','Close Opening Window','Manually close or it auto-closes after 10 minutes.'],
+                    ['▶','Start Closing Window','Students scan again. Scanning now = LATE. Both windows = PRESENT.'],
+                    ['🔒','Lock Attendance','Finalize. P = both windows, L = one window, A = none.'],
+                    ['📊','Export','Download Excel sheet after locking.'],
+                ].map(([ic,t,d]) => `
+                    <div style="display:flex;gap:12px;align-items:flex-start">
+                        <span style="font-size:20px;flex-shrink:0">${ic}</span>
+                        <div><div style="font-weight:600;font-size:13px">${t}</div>
+                        <div style="font-size:12px;color:var(--muted);margin-top:2px">${d}</div></div>
+                    </div>`).join('')}
+            </div>
+        </div>`;
+}
+
+async function startOpeningSession() {
+    const topic      = document.getElementById('fTopic').value.trim();
+    const courseCode = document.getElementById('fCourse').value;
+    const section    = document.getElementById('fSection').value;
+    const errEl      = document.getElementById('startErr');
+    errEl.style.display = 'none';
+
+    if (!topic) { errEl.textContent = '⚠ Please enter a session topic'; errEl.style.display = 'block'; document.getElementById('fTopic').classList.add('err'); return; }
+    document.getElementById('fTopic').classList.remove('err');
+
+    const r = await fetch('/api/faculty/start-session', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic, courseCode, section, facultyId: faculty.id, facultyName: faculty.name })
+    });
+    const data = await r.json();
+    if (!r.ok) { toast('Error: ' + (data.error || 'Unknown error'), 'err'); return; }
+
+    currentSession = { sessionId: data.sessionId, topic, courseCode, section, status: 'opening', startedAt: Date.now() };
+    tokenExpiry = data.expiresAt;
+    renderLiveSession(document.getElementById('pageContent'));
+    updateQR(data.qrCode, data.token);
+    startWindowTimer(10 * 60 * 1000, 'opening');
+    startPolling();
+    toast('✅ Opening window started — 10 minutes');
+}
+
+// ── LIVE SESSION ──────────────────────────────────────────────────────────────
+function renderLiveSession(c) {
+    const s = currentSession;
+    c.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
+            <div>
+                <h2 style="font-size:18px;font-weight:700" id="sesTitle">${s.topic || 'Loading…'}</h2>
+                <div style="font-size:13px;color:var(--muted);margin-top:2px" id="sesMeta">${s.courseCode || ''} · ${s.section || ''} · ${faculty?.name || ''}</div>
+            </div>
+            <div class="session-badge badge-opening pulse" id="windowBadge">● OPENING WINDOW</div>
+        </div>
+
+        <!-- Window countdown -->
+        <div class="window-timer" id="windowTimerBlock">
+            <div class="window-info">
+                <div class="window-label" id="windowTimerLabel">Opening Window — Time Remaining</div>
+                <div class="window-desc" id="windowTimerDesc">Students can scan QR code to record attendance</div>
+            </div>
+            <div class="window-clock" id="windowClock">10:00</div>
+        </div>
+
+        <!-- Action buttons (context-sensitive) -->
+        <div class="action-row" id="actionRow"></div>
+
+        <!-- QR area (hidden when opening_locked) -->
+        <div class="qr-area" id="qrArea">
+            <div class="qr-wrap" id="qrImgWrap">
+                <div style="color:#94a3b8;font-size:13px">Generating…</div>
+            </div>
+            <div class="qr-info">
+                <div class="qr-token-label">Current Token (show on projector)</div>
+                <div class="qr-token" id="tokenDisp">——————</div>
+                <div class="countdown-wrap">
+                    <div class="countdown-track"><div class="countdown-fill" id="countdownFill" style="width:100%;background:#60a5fa"></div></div>
+                    <div class="countdown-num" id="countdownNum">30s</div>
+                </div>
+                <div style="font-size:12px;color:rgba(255,255,255,.5);line-height:1.7">
+                    Token rotates every <strong style="color:#fff">30 seconds</strong>.<br>
+                    Students enter token manually or scan QR.
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-row">
+            <div class="stat"><div class="stat-val s-green" id="sPresent">0</div><div class="stat-lbl">Present</div></div>
+            <div class="stat"><div class="stat-val s-yellow" id="sLate">0</div><div class="stat-lbl">Late</div></div>
+            <div class="stat"><div class="stat-val s-red" id="sAbsent">0</div><div class="stat-lbl">Absent / Pending</div></div>
+        </div>
+
+        <!-- Roster -->
+        <div class="roster-wrap">
+            <div class="roster-head">
+                <div class="roster-label">Live Roster</div>
+                <button class="btn btn-outline btn-sm" onclick="pollSession()">↻ Refresh</button>
+            </div>
+            <table>
+                <thead><tr><th>Roll No.</th><th>Name</th><th>Status</th><th>Override</th></tr></thead>
+                <tbody id="rosterBody"><tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted)">Loading…</td></tr></tbody>
+            </table>
+        </div>`;
+
+    updateActionRow();
+    startTokenCountdown();
+    pollSession();
+}
+
+function updateActionRow() {
+    const row = document.getElementById('actionRow');
+    if (!row || !currentSession) return;
+    const st = currentSession.status;
+
+    if (st === 'opening') {
+        row.innerHTML = `
+            <button class="btn btn-warning" onclick="closeOpeningWindow()">🔒 Close Opening Window</button>`;
+    } else if (st === 'opening_locked') {
+        row.innerHTML = `
+            <button class="btn btn-success" onclick="resumeOpeningWindow()">▶ Resume Opening Window</button>
+            <button class="btn btn-primary" onclick="startClosingWindow()">▶ Start Closing Window (10 min)</button>`;
+    } else if (st === 'closing') {
+        row.innerHTML = `
+            <button class="btn btn-danger" onclick="lockAttendance()">🔒 Lock Attendance</button>`;
+    } else if (st === 'locked') {
+        row.innerHTML = `
+            <button class="btn btn-success" onclick="exportSession()">📊 Export Excel</button>
+            <button class="btn btn-outline" onclick="finishSession()">✓ Done</button>`;
+    }
+}
+
+function updateWindowBadge(status) {
+    const badge = document.getElementById('windowBadge');
+    if (!badge) return;
+    const map = {
+        opening:        ['badge-opening pulse', '● OPENING WINDOW'],
+        opening_locked: ['badge-locked-o', '🔒 OPENING CLOSED'],
+        closing:        ['badge-closing pulse', '● CLOSING WINDOW'],
+        locked:         ['badge-locked', '🔒 ATTENDANCE LOCKED'],
+    };
+    const [cls, txt] = map[status] || ['badge-opening', status];
+    badge.className = 'session-badge ' + cls;
+    badge.textContent = txt;
+}
+
+function updateWindowTimerBlock(status) {
+    const block = document.getElementById('windowTimerBlock');
+    const label = document.getElementById('windowTimerLabel');
+    const desc  = document.getElementById('windowTimerDesc');
+    if (!block) return;
+    if (status === 'opening') {
+        block.style.background = 'linear-gradient(135deg,#1e2d4a,#243558)';
+        if (label) label.textContent = 'Opening Window — Time Remaining';
+        if (desc)  desc.textContent  = 'Students can scan QR code to record attendance';
+    } else if (status === 'opening_locked') {
+        block.style.background = 'linear-gradient(135deg,#1e1e3a,#2d1e4a)';
+        if (label) label.textContent = 'Opening Window Closed';
+        if (desc)  desc.textContent  = 'Start the closing window when ready.';
+        const clk = document.getElementById('windowClock');
+        if (clk) clk.textContent = '--:--';
+    } else if (status === 'closing') {
+        block.style.background = 'linear-gradient(135deg,#3a2000,#4a2800)';
+        if (label) label.textContent = 'Closing Window — Time Remaining';
+        if (desc)  desc.innerHTML   = '⚠️ Students scanning now will be marked <strong>LATE</strong>';
+    } else if (status === 'locked') {
+        block.style.background = 'linear-gradient(135deg,#1e293b,#334155)';
+        if (label) label.textContent = 'Attendance Locked';
+        if (desc)  desc.textContent  = 'Attendance has been finalized. Export the Excel sheet below.';
+        const clk = document.getElementById('windowClock');
+        if (clk) clk.textContent = '--:--';
+    }
+}
+
+// ── SESSION CONTROLS ──────────────────────────────────────────────────────────
+async function closeOpeningWindow() {
+    const r = await fetch(`/api/faculty/lock-opening/${currentSession.sessionId}`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'Error', 'err'); return; }
+    currentSession.status = 'opening_locked';
+    stopWindowTimer();
+    updateActionRow();
+    updateWindowBadge('opening_locked');
+    updateWindowTimerBlock('opening_locked');
+    hideQRArea();
+    toast('🔒 Opening window closed');
+}
+
+async function resumeOpeningWindow() {
+    const r = await fetch(`/api/faculty/resume-opening/${currentSession.sessionId}`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'Error', 'err'); return; }
+    currentSession.status = 'opening';
+    tokenExpiry = d.expiresAt;
+    showQRArea();
+    updateQR(d.qrCode, d.token);
+    startWindowTimer(10 * 60 * 1000, 'opening');
+    updateActionRow();
+    updateWindowBadge('opening');
+    updateWindowTimerBlock('opening');
+    startPolling();
+    toast('▶ Opening window resumed — 10 minutes');
+}
+
+async function startClosingWindow() {
+    const r = await fetch(`/api/faculty/start-closing/${currentSession.sessionId}`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'Error', 'err'); return; }
+    currentSession.status = 'closing';
+    tokenExpiry = d.expiresAt;
+    showQRArea();
+    updateQR(d.qrCode, d.token);
+    startWindowTimer(10 * 60 * 1000, 'closing');
+    updateActionRow();
+    updateWindowBadge('closing');
+    updateWindowTimerBlock('closing');
+    startPolling();
+    toast('⏰ Closing window started — 10 minutes');
+}
+
+async function lockAttendance() {
+    if (!confirm('Lock attendance? Students not scanned in any window will be marked ABSENT.\nP = both windows  |  L = one window  |  A = none')) return;
+    const r = await fetch(`/api/faculty/lock-session/${currentSession.sessionId}`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'Error', 'err'); return; }
+    currentSession.status = 'locked';
+    stopPolling(); stopWindowTimer();
+    updateActionRow();
+    updateWindowBadge('locked');
+    updateWindowTimerBlock('locked');
+    hideQRArea();
+    pollSession();
+    toast('🔒 Attendance locked successfully');
+}
+
+async function exportSession() {
+    if (!currentSession) { toast('No session selected', 'err'); return; }
+    window.open(`/api/faculty/export/${currentSession.sessionId}`, '_blank');
+}
+
+function finishSession() {
+    currentSession = null;
+    stopPolling(); stopWindowTimer();
+    renderStartSession(document.getElementById('pageContent'));
+    toast('✓ Session complete');
+}
+
+function hideQRArea() {
+    const qa = document.getElementById('qrArea');
+    if (qa) qa.style.display = 'none';
+}
+function showQRArea() {
+    const qa = document.getElementById('qrArea');
+    if (qa) qa.style.display = 'flex';
+}
+
+// ── POLLING ───────────────────────────────────────────────────────────────────
+function startPolling() {
+    stopPolling();
+    pollInterval = setInterval(pollSession, 2500);
+}
+function stopPolling() {
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+}
+
+async function pollSession() {
+    if (!currentSession || !currentSession.sessionId) return;
+    try {
+        const r = await fetch(`/api/faculty/session/${currentSession.sessionId}`);
+        if (!r.ok) return;
+        const d = await r.json();
+
+        // Sync status from server
+        if (d.session) {
+            const serverStatus = d.session.status;
+            const serverLocked = d.session.locked;
+            if (serverLocked && currentSession.status !== 'locked') {
+                currentSession.status = 'locked';
+                stopPolling(); stopWindowTimer();
+                updateActionRow(); updateWindowBadge('locked'); updateWindowTimerBlock('locked'); hideQRArea();
+            } else if (!serverLocked && serverStatus !== currentSession.status) {
+                currentSession.status = serverStatus;
             }
         }
 
-        function renderStartSession(c) {
-            const courses = (faculty?.courses || ['SE-2001']).map(c => `<option value="${c}">${c}</option>`).join('');
-            const today = new Date().toISOString().split('T')[0];
-            c.innerHTML = `
-                <div class="card">
-                    <div class="card-title">Start New Attendance Session</div>
-                    <div class="form-grid">
-                        <div class="fgroup">
-                            <label>Course</label>
-                            <select id="fCourse">${courses}</select>
-                        </div>
-                        <div class="fgroup">
-                            <label>Section</label>
-                            <select id="fSection">
-                                <option value="BSE-243A">BSE-243A</option>
-                                <option value="BSE-243B">BSE-243B</option>
-                            </select>
-                        </div>
-                        <div class="fgroup">
-                            <label>Session Date</label>
-                            <input type="date" id="fDate" value="${today}">
-                        </div>
-                        <div class="fgroup form-full">
-                            <label>Session Topic</label>
-                            <input id="fTopic" placeholder="e.g., Requirements Elicitation">
-                        </div>
-                    </div>
-                    <button class="btn btn-primary" onclick="startOpeningSession()">▶ Start Opening Window (10 min)</button>
-                </div>
-                <div class="card">
-                    <div class="card-title">How It Works</div>
-                    <div style="display:flex;flex-direction:column;gap:12px">
-                        <div><strong>1.</strong> Start Opening Window → Students scan QR (marked as "Opening Recorded")</div>
-                        <div><strong>2.</strong> Lock Opening Window when ready (or auto after 10 min)</div>
-                        <div><strong>3.</strong> Start Closing Window → Students scan again (marked as LATE or PRESENT)</div>
-                        <div><strong>4.</strong> Lock Attendance → Finalize and export Excel sheet</div>
-                    </div>
-                </div>`;
+        // Update QR/token
+        if (d.token && d.token !== document.getElementById('tokenDisp')?.textContent && currentSession.status !== 'opening_locked') {
+            tokenExpiry = d.expiresAt;
+            updateQR(d.qrCode, d.token);
         }
 
-        async function startOpeningSession() {
-            const topic = document.getElementById('fTopic').value.trim();
-            const courseCode = document.getElementById('fCourse').value;
-            const section = document.getElementById('fSection').value;
-            const sessionDate = document.getElementById('fDate').value;
-            
-            if (!topic) { toast('⚠ Enter session topic'); return; }
-            
-            const r = await fetch('/api/faculty/start-session', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ topic, courseCode, section, facultyId: faculty.id, facultyName: faculty.name, sessionDate })
-            });
-            
-            const data = await r.json();
-            if (!r.ok) { toast('Error: ' + data.error); return; }
-            
-            currentSession = { sessionId: data.sessionId, token: data.token, qrCode: data.qrCode, expiresAt: data.expiresAt, status: 'opening', startedAt: Date.now() };
-            tokenExpiry = data.expiresAt;
-            
-            renderLiveSession(document.getElementById('pageContent'));
-            startPolling();
-            startTokenTimer();
-            startOpeningTimer();
-            toast('✅ Opening window started - 10 minutes');
+        // Update stats
+        const ids = ['sPresent','sLate','sAbsent'];
+        const vals = [d.presentCount, d.lateCount, d.absentCount];
+        ids.forEach((id, i) => { const el = document.getElementById(id); if (el) el.textContent = vals[i] ?? 0; });
+
+        // Update roster
+        const tbody = document.getElementById('rosterBody');
+        if (tbody && d.roster) {
+            tbody.innerHTML = d.roster.map(s => {
+                const st = s.status || 'Absent';
+                let cls = 'sb-absent';
+                if (st.startsWith('Present')) cls = 'sb-present';
+                else if (st === 'Late') cls = 'sb-late';
+                else if (st.includes('Opening')) cls = 'sb-opening';
+                else if (st.includes('override')) cls = 'sb-override';
+                return `<tr>
+                    <td class="roll-mono">${s.rollNo}</td>
+                    <td style="font-weight:500">${s.name}</td>
+                    <td><span class="sbadge ${cls}">${st}</span></td>
+                    <td>${currentSession.status !== 'locked' ? `<button class="btn btn-outline btn-sm" onclick="openOverride('${s.rollNo}','${s.name}')">Override</button>` : '—'}</td>
+                </tr>`;
+            }).join('');
         }
+    } catch (e) { /* silent */ }
+}
 
-        function renderLiveSession(c) {
-            c.innerHTML = `
-                <div class="timer-display" id="timerDisplay">
-                    <div class="timer-label" id="windowLabel">OPENING WINDOW</div>
-                    <div class="timer-clock" id="timerClock">10:00</div>
-                    <div style="font-size:12px; opacity:0.7;" id="windowStatus">Students can scan QR to record attendance</div>
-                </div>
-                
-                <div class="action-buttons">
-                    <button class="btn btn-warning" id="lockOpeningBtn" onclick="lockOpeningWindow()">🔒 Lock Opening Window</button>
-                    <button class="btn btn-primary" id="startClosingBtn" style="display:none;" onclick="startClosingWindow()">▶ Start Closing Window (10 min)</button>
-                    <button class="btn btn-danger" id="lockAttendanceBtn" style="display:none;" onclick="lockAttendance()">🔒 Lock Attendance & Export</button>
-                    <button class="btn btn-outline" onclick="exportSession()">📊 Export Excel</button>
-                </div>
-                
-                <div class="qr-area">
-                    <div class="qr-wrap" id="qrImgWrap"><img src="${currentSession.qrCode}" style="width:188px;height:188px"></div>
-                    <div class="qr-info">
-                        <div style="font-size:11px;opacity:0.6;">Current Token</div>
-                        <div class="qr-token" id="tokenDisp">${currentSession.token}</div>
-                        <div style="font-size:12px;opacity:0.7;">Token rotates every 30 seconds</div>
-                    </div>
-                </div>
-                
-                <div class="stats-row">
-                    <div class="stat"><div class="stat-val s-green" id="presentCount">0</div><div class="stat-lbl">Present</div></div>
-                    <div class="stat"><div class="stat-val s-yellow" id="lateCount">0</div><div class="stat-lbl">Late</div></div>
-                    <div class="stat"><div class="stat-val s-red" id="absentCount">0</div><div class="stat-lbl">Absent</div></div>
-                </div>
-                
-                <div class="roster-wrap">
-                    <div class="roster-head"><div class="roster-label">Student Roster</div><button class="btn btn-outline btn-sm" onclick="refreshRoster()">↻ Refresh</button></div>
-                    <table><thead><tr><th>Roll No.</th><th>Name</th><th>Status</th><th>Override</th></tr></thead><tbody id="rosterBody"><tr><td colspan="4" style="text-align:center">Loading...</td></tr></tbody></table>
-                </div>`;
-        }
+function updateQR(qrCode, token) {
+    const w = document.getElementById('qrImgWrap');
+    const t = document.getElementById('tokenDisp');
+    if (w && qrCode) w.innerHTML = `<img src="${qrCode}" style="width:188px;height:188px">`;
+    if (t && token)  t.textContent = token;
+}
 
-        let openingTimer = null;
-        let openingEndTime = null;
+// ── TOKEN COUNTDOWN BAR ───────────────────────────────────────────────────────
+let tokenCountdownInterval = null;
+function startTokenCountdown() {
+    if (tokenCountdownInterval) clearInterval(tokenCountdownInterval);
+    tokenCountdownInterval = setInterval(() => {
+        if (!tokenExpiry) return;
+        const rem = Math.max(0, tokenExpiry - Date.now());
+        const pct = (rem / 30000) * 100;
+        const fill = document.getElementById('countdownFill');
+        const num  = document.getElementById('countdownNum');
+        if (fill) { fill.style.width = pct + '%'; fill.style.background = pct > 40 ? '#60a5fa' : pct > 15 ? '#f59e0b' : '#f87171'; }
+        if (num)  num.textContent = Math.ceil(rem / 1000) + 's';
+    }, 300);
+}
 
-        function startOpeningTimer() {
-            if (openingTimer) clearInterval(openingTimer);
-            openingEndTime = Date.now() + (10 * 60 * 1000);
-            
-            openingTimer = setInterval(() => {
-                const remaining = Math.max(0, openingEndTime - Date.now());
-                const minutes = Math.floor(remaining / 60000);
-                const seconds = Math.floor((remaining % 60000) / 1000);
-                const clock = document.getElementById('timerClock');
-                if (clock) clock.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                
-                if (remaining <= 0) {
-                    clearInterval(openingTimer);
-                    lockOpeningWindow();
-                }
-            }, 1000);
-        }
+// ── 10-MIN WINDOW TIMER ───────────────────────────────────────────────────────
+function startWindowTimer(durationMs, windowType) {
+    stopWindowTimer();
+    windowEndTime = Date.now() + durationMs;
+    updateWindowTimerBlock(windowType);
+    updateWindowBadge(windowType);
 
-        function startClosingTimer() {
-            if (openingTimer) clearInterval(openingTimer);
-            const closingEndTime = Date.now() + (10 * 60 * 1000);
-            
-            openingTimer = setInterval(() => {
-                const remaining = Math.max(0, closingEndTime - Date.now());
-                const minutes = Math.floor(remaining / 60000);
-                const seconds = Math.floor((remaining % 60000) / 1000);
-                const clock = document.getElementById('timerClock');
-                if (clock) clock.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                
-                if (remaining <= 0) {
-                    clearInterval(openingTimer);
-                    toast('⏰ Closing window ended - Please lock attendance');
-                }
-            }, 1000);
-        }
-
-        async function lockOpeningWindow() {
-            const r = await fetch(`/api/faculty/lock-opening/${currentSession.sessionId}`, { method: 'POST' });
-            if (!r.ok) { toast('Error locking opening window'); return; }
-            
-            clearInterval(openingTimer);
-            currentSession.status = 'opening_locked';
-            
-            const timerDisplay = document.getElementById('timerDisplay');
-            const lockOpeningBtn = document.getElementById('lockOpeningBtn');
-            const startClosingBtn = document.getElementById('startClosingBtn');
-            
-            timerDisplay.style.background = 'linear-gradient(135deg, #4a1e2d, #2d1e3a)';
-            document.getElementById('windowLabel').textContent = 'OPENING WINDOW LOCKED';
-            document.getElementById('windowStatus').textContent = 'Opening window closed. Start closing window now.';
-            lockOpeningBtn.style.display = 'none';
-            startClosingBtn.style.display = 'inline-flex';
-            
-            toast('🔒 Opening window locked');
-        }
-
-        async function startClosingWindow() {
-            const r = await fetch(`/api/faculty/start-closing/${currentSession.sessionId}`, { method: 'POST' });
-            if (!r.ok) { toast('Error starting closing window'); return; }
-            
-            currentSession.status = 'closing';
-            
-            const timerDisplay = document.getElementById('timerDisplay');
-            const startClosingBtn = document.getElementById('startClosingBtn');
-            const lockAttendanceBtn = document.getElementById('lockAttendanceBtn');
-            
-            timerDisplay.style.background = 'linear-gradient(135deg, #4a3a1e, #3a2d1e)';
-            document.getElementById('windowLabel').textContent = 'CLOSING WINDOW';
-            document.getElementById('windowStatus').innerHTML = '⚠️ Students scanning now will be marked LATE';
-            startClosingBtn.style.display = 'none';
-            lockAttendanceBtn.style.display = 'inline-flex';
-            
-            startClosingTimer();
-            toast('⏰ Closing window started - 10 minutes');
-        }
-
-        async function lockAttendance() {
-            if (!confirm('Lock attendance? Students without both scans will be marked ABSENT. An Excel sheet will be generated.')) return;
-            
-            const r = await fetch(`/api/faculty/lock-session/${currentSession.sessionId}`, { method: 'POST' });
-            if (!r.ok) { toast('Error locking attendance'); return; }
-            
-            clearInterval(openingTimer);
-            clearInterval(pollInterval);
-            clearInterval(tokenTimer);
-            
-            currentSession.locked = true;
-            toast('🔒 Attendance locked - Excel sheet generated');
-            
-            setTimeout(() => {
-                currentSession = null;
-                showPage('attendance');
-            }, 2000);
-        }
-
-        async function exportSession() {
-            if (!currentSession) { toast('No active session'); return; }
-            window.open(`/api/faculty/export/${currentSession.sessionId}`, '_blank');
-        }
-
-        async function refreshRoster() { await pollSession(); }
-
-        async function pollSession() {
-            if (!currentSession) return;
-            const r = await fetch(`/api/faculty/session/${currentSession.sessionId}`);
-            if (!r.ok) return;
-            const data = await r.json();
-            
-            if (data.token && data.token !== currentSession.token) {
-                currentSession.token = data.token;
-                const tokenDisp = document.getElementById('tokenDisp');
-                const qrWrap = document.getElementById('qrImgWrap');
-                if (tokenDisp) tokenDisp.textContent = data.token;
-                if (qrWrap && data.qrCode) qrWrap.innerHTML = `<img src="${data.qrCode}" style="width:188px;height:188px">`;
-            }
-            
-            document.getElementById('presentCount').textContent = data.presentCount;
-            document.getElementById('lateCount').textContent = data.lateCount;
-            document.getElementById('absentCount').textContent = data.absentCount;
-            
-            const tbody = document.getElementById('rosterBody');
-            if (tbody && data.roster) {
-                tbody.innerHTML = data.roster.map(s => {
-                    let cls = 'sb-absent';
-                    if (s.status.includes('Present')) cls = 'sb-present';
-                    else if (s.status.includes('Late')) cls = 'sb-late';
-                    else if (s.status.includes('Opening')) cls = 'sb-opening';
-                    return `<tr><td class="roll-mono">${s.rollNo}</td><td>${s.name}</td><td><span class="sbadge ${cls}">${s.status}</span></td><td><button class="btn btn-outline btn-sm" onclick="openOverride('${s.rollNo}','${s.name}')">Override</button></td></tr>`;
-                }).join('');
+    windowTimer = setInterval(() => {
+        const remaining = Math.max(0, windowEndTime - Date.now());
+        const m = Math.floor(remaining / 60000);
+        const s = Math.floor((remaining % 60000) / 1000);
+        const clk = document.getElementById('windowClock');
+        if (clk) clk.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        if (remaining <= 0) {
+            stopWindowTimer();
+            if (windowType === 'opening' && currentSession?.status === 'opening') {
+                // Auto-close triggered server-side; just update UI
+                currentSession.status = 'opening_locked';
+                updateActionRow(); updateWindowBadge('opening_locked'); updateWindowTimerBlock('opening_locked'); hideQRArea();
+                toast('⏱ Opening window auto-closed');
+            } else if (windowType === 'closing' && currentSession?.status === 'closing') {
+                toast('⏱ Closing window ended — attendance auto-locked');
             }
         }
+    }, 500);
+}
 
-        let tokenTimer = null;
-        function startTokenTimer() {
-            if (tokenTimer) clearInterval(tokenTimer);
-            tokenTimer = setInterval(async () => {
-                if (!currentSession || currentSession.locked) return;
-                const r = await fetch(`/api/faculty/session/${currentSession.sessionId}`);
-                const data = await r.json();
-                if (data.token && data.token !== currentSession.token) {
-                    currentSession.token = data.token;
-                    const tokenDisp = document.getElementById('tokenDisp');
-                    const qrWrap = document.getElementById('qrImgWrap');
-                    if (tokenDisp) tokenDisp.textContent = data.token;
-                    if (qrWrap && data.qrCode) qrWrap.innerHTML = `<img src="${data.qrCode}" style="width:188px;height:188px">`;
-                }
-            }, 2000);
+function stopWindowTimer() {
+    if (windowTimer) { clearInterval(windowTimer); windowTimer = null; }
+}
+
+// ── OVERRIDE ──────────────────────────────────────────────────────────────────
+function openOverride(rollNo, name) {
+    document.getElementById('ovRollNo').value = rollNo;
+    document.getElementById('ovName').value   = name;
+    document.getElementById('overrideOverlay').classList.add('show');
+}
+function closeModal() { document.getElementById('overrideOverlay').classList.remove('show'); }
+
+async function submitOverride() {
+    const rollNo = document.getElementById('ovRollNo').value;
+    const status = document.getElementById('ovStatus').value;
+    if (!rollNo || !status) { toast('Missing data', 'err'); return; }
+    const r = await fetch(`/api/faculty/override/${currentSession.sessionId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rollNo, status })
+    });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'Error saving override', 'err'); return; }
+    closeModal();
+    await pollSession();
+    toast('✓ Override saved');
+}
+
+// ── HISTORY PAGE ──────────────────────────────────────────────────────────────
+async function renderHistoryPage(c) {
+    c.innerHTML = '<div style="text-align:center;padding:48px;color:var(--muted)">Loading history…</div>';
+    try {
+        const r = await fetch(`/api/faculty/history?facultyId=${faculty.id}`);
+        if (!r.ok) { c.innerHTML = '<div style="padding:40px;color:var(--red)">Failed to load history.</div>'; return; }
+        const sessions = await r.json();
+
+        if (!sessions.length) {
+            c.innerHTML = `<div style="text-align:center;padding:60px">
+                <div style="font-size:52px;opacity:.3;margin-bottom:16px">📋</div>
+                <div style="font-size:20px;font-weight:600;margin-bottom:8px">No History Yet</div>
+                <div style="font-size:14px;color:var(--muted)">Locked sessions will appear here.</div>
+            </div>`;
+            return;
         }
 
-        function startPolling() {
-            if (pollInterval) clearInterval(pollInterval);
-            pollInterval = setInterval(pollSession, 3000);
-        }
+        const courses  = [...new Set(sessions.map(s => s.courseCode))];
+        const sections = [...new Set(sessions.map(s => s.section))];
 
-        async function renderHistory(c) {
-            const r = await fetch(`/api/faculty/history?facultyId=${faculty.id}`);
-            const sessions = await r.json();
-            
-            if (!sessions.length) {
-                c.innerHTML = '<div class="card"><div style="text-align:center;padding:40px">No past sessions found</div></div>';
-                return;
-            }
-            
-            c.innerHTML = sessions.map(s => `
-                <div class="card" style="margin-bottom:20px">
-                    <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap">
-                        <div>
-                            <h3 style="font-size:16px;margin-bottom:5px">${s.topic}</h3>
-                            <div style="font-size:12px;color:var(--muted)">${s.courseCode} · ${s.section} · ${new Date(s.startedAt).toLocaleString()}</div>
-                            <div style="margin-top:10px;display:flex;gap:15px">
-                                <span style="color:var(--green)">✅ Present: ${s.present}</span>
-                                <span style="color:var(--yellow)">⏰ Late: ${s.late}</span>
-                                <span style="color:var(--red)">❌ Absent: ${s.absent}</span>
-                            </div>
-                        </div>
-                        <button class="btn btn-outline btn-sm" onclick="window.open('/api/faculty/export/${s.sessionId}', '_blank')">📊 Export Excel</button>
+        c.innerHTML = `
+            <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:flex-end">
+                <div style="flex:1;min-width:140px">
+                    <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">Course</label>
+                    <select id="hCourse" onchange="applyHistFilter()" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+                        <option value="">All Courses</option>
+                        ${courses.map(c2 => `<option value="${c2}">${c2}</option>`).join('')}
+                    </select>
+                </div>
+                <div style="flex:1;min-width:140px">
+                    <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">Section</label>
+                    <select id="hSection" onchange="applyHistFilter()" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+                        <option value="">All Sections</option>
+                        ${sections.map(s2 => `<option value="${s2}">${s2}</option>`).join('')}
+                    </select>
+                </div>
+                <button class="btn btn-outline btn-sm" onclick="renderHistoryPage(document.getElementById('pageContent'))">↻ Refresh</button>
+            </div>
+            <div id="histCards"></div>`;
+
+        window._histSessions = sessions;
+        applyHistFilter();
+    } catch (e) {
+        c.innerHTML = '<div style="padding:40px;color:var(--red)">Error loading history.</div>';
+    }
+}
+
+function applyHistFilter() {
+    const course  = document.getElementById('hCourse')?.value  || '';
+    const section = document.getElementById('hSection')?.value || '';
+    let filtered  = (window._histSessions || []);
+    if (course)  filtered = filtered.filter(s => s.courseCode === course);
+    if (section) filtered = filtered.filter(s => s.section === section);
+    renderHistCards(filtered);
+}
+
+function renderHistCards(sessions) {
+    const container = document.getElementById('histCards');
+    if (!container) return;
+    if (!sessions.length) { container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">No sessions match the filter.</div>'; return; }
+
+    container.innerHTML = sessions.map(s => {
+        const dt = new Date(Number(s.startedAt));
+        const dateStr = dt.toLocaleDateString('en-PK', { year:'numeric', month:'short', day:'numeric' });
+        const timeStr = dt.toLocaleTimeString('en-PK', { hour:'2-digit', minute:'2-digit' });
+        const pct = s.total ? Math.round(((s.present + s.late) / s.total) * 100) : 0;
+
+        const rows = s.records.map(r => {
+            let sty = 'background:#fee2e2;color:#b91c1c', lbl = 'A';
+            if (r.status === 'Present') { sty = 'background:#dcfce7;color:#15803d'; lbl = 'P'; }
+            else if (r.status === 'Late') { sty = 'background:#fef9c3;color:#854d0e'; lbl = 'L'; }
+            return `<tr>
+                <td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-family:monospace;font-size:12px">${r.rollNo}</td>
+                <td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-size:13px">${r.name}</td>
+                <td style="padding:8px 14px;border-bottom:1px solid #f1f5f9">
+                    <span title="${r.status}" style="display:inline-block;padding:2px 10px;border-radius:5px;font-size:11px;font-weight:700;${sty}">${lbl} — ${r.status}</span>
+                </td>
+            </tr>`;
+        }).join('');
+
+        return `<div class="hist-card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+                <div>
+                    <div style="font-size:16px;font-weight:700;margin-bottom:4px">${s.topic}</div>
+                    <div style="font-size:12px;color:var(--muted)">${s.courseCode} · ${s.section} · ${dateStr}, ${timeStr}</div>
+                    <div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap">
+                        <span style="font-size:13px;color:var(--green);font-weight:600">✅ ${s.present} Present</span>
+                        <span style="font-size:13px;color:var(--yellow);font-weight:600">⏰ ${s.late} Late</span>
+                        <span style="font-size:13px;color:var(--red);font-weight:600">❌ ${s.absent} Absent</span>
+                        <span style="font-size:13px;color:var(--muted)">/ ${s.total} total · <strong>${pct}%</strong></span>
                     </div>
                 </div>
-            `).join('');
-        }
-
-        function openOverride(rollNo, name) {
-            document.getElementById('ovRollNo').value = rollNo;
-            document.getElementById('ovName').value = name;
-            document.getElementById('overrideOverlay').classList.add('show');
-        }
-
-        function closeModal() { document.getElementById('overrideOverlay').classList.remove('show'); }
-
-        async function submitOverride() {
-            const rollNo = document.getElementById('ovRollNo').value;
-            const status = document.getElementById('ovStatus').value;
-            await fetch(`/api/faculty/override/${currentSession.sessionId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rollNo, status, reason: 'Manual override' })
-            });
-            closeModal();
-            await pollSession();
-            toast('✓ Override saved');
-        }
-
-        function toast(msg) {
-            const t = document.getElementById('toast');
-            t.textContent = msg;
-            t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), 3000);
-        }
-    </script>
+                <button class="btn btn-success btn-sm" onclick="window.open('/api/faculty/export/${s.sessionId}','_blank')">📊 Export Excel</button>
+            </div>
+            <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto">
+                <table style="width:100%;border-collapse:collapse">
+                    <thead><tr style="background:#f8fafc">
+                        <th style="text-align:left;padding:9px 14px;font-size:11px;font-weight:600;color:var(--muted)">Roll No.</th>
+                        <th style="text-align:left;padding:9px 14px;font-size:11px;font-weight:600;color:var(--muted)">Name</th>
+                        <th style="text-align:left;padding:9px 14px;font-size:11px;font-weight:600;color:var(--muted)">Status</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        </div>`;
+    }).join('');
+}
+</script>
 </body>
 </html>
