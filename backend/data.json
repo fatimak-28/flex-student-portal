@@ -1,0 +1,684 @@
+{
+  "faculty": [
+    {
+      "id": "FAC-001",
+      "name": "Dr. Zeeshan Ali Rana",
+      "dept": "SE",
+      "pass": "admin",
+      "courses": [
+        "SE-2001",
+        "SE-3002"
+      ]
+    },
+    {
+      "id": "FAC-002",
+      "name": "Dr. Aisha Tariq",
+      "dept": "CS",
+      "pass": "admin",
+      "courses": [
+        "CS-3001"
+      ]
+    }
+  ],
+  "students": [
+    {
+      "roll_no": "23L-3007",
+      "name": "Muhammad Abdullah Haider",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "23L-3077",
+      "name": "Muhammad Manan",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "23L-3094",
+      "name": "Muhammad Ahmad",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "23L-3097",
+      "name": "Abdul Muiz",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "23L-3102",
+      "name": "Muhammad Hassan",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24I-3023",
+      "name": "Ali Saad",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24I-3078",
+      "name": "Muhammad Umar Ashraf",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-2551",
+      "name": "Hamna Faisal",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3003",
+      "name": "Adina Saqib",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3008",
+      "name": "Eman Fatima",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3010",
+      "name": "Ahmad Abrar",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3011",
+      "name": "Muhammad Moiz Dil",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3012",
+      "name": "Abdul Moez",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3018",
+      "name": "Muhammad Talha Hamid",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3027",
+      "name": "Fatima Kamran",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3031",
+      "name": "Ahmed Akhtar",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3034",
+      "name": "Muhammad Hammad Mushtaq",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3035",
+      "name": "Muhammad Waleed",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3036",
+      "name": "Bilal Kashif",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3037",
+      "name": "Mahrukh Rehman",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3049",
+      "name": "Ahmad Ali Khan",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3050",
+      "name": "Saad Mehmood Athar",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3051",
+      "name": "Mustafa Salman Ahmed",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3052",
+      "name": "Ramsha Khalid",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3054",
+      "name": "Muhammad Hanzala Siddique",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3057",
+      "name": "Muhammad Shahzaib Zia",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3060",
+      "name": "Muhammad Moeed Amir",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3061",
+      "name": "Abdullah Tahir",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3067",
+      "name": "Sheikh Muhammad Ammar Arif",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3068",
+      "name": "Zuhar Faisal",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3072",
+      "name": "Suleman Ahmed",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3078",
+      "name": "Zainab Sharif",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3079",
+      "name": "Maryam Bint E Ashfaq",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3081",
+      "name": "Shahzaib Saeed",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3083",
+      "name": "Areeba Iqbal",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3088",
+      "name": "Kashif Abbas",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3089",
+      "name": "Asadullah Nasir",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3090",
+      "name": "Bilal Ahmad",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3093",
+      "name": "Rabia",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3096",
+      "name": "Anoosha Rizwan Vohra",
+      "section": "BSE-243A",
+      "pass": "pass"
+    },
+    {
+      "roll_no": "24L-3097",
+      "name": "Manumha Nadeem",
+      "section": "BSE-243A",
+      "pass": "pass"
+    }
+  ],
+  "sessions": {
+    "SES-1777926059601": {
+      "sessionId": "SES-1777926059601",
+      "topic": "sre",
+      "courseCode": "SE-2001",
+      "section": "BSE-243A",
+      "facultyId": "FAC-001",
+      "facultyName": "Dr. Zeeshan Ali Rana",
+      "startedAt": 1777926059601,
+      "status": "locked",
+      "locked": true,
+      "overrides": [],
+      "lockedAt": 1777926736673
+    }
+  },
+  "attendance_records": [
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "23L-3007",
+      "name": "Muhammad Abdullah Haider",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "23L-3077",
+      "name": "Muhammad Manan",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "23L-3094",
+      "name": "Muhammad Ahmad",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "23L-3097",
+      "name": "Abdul Muiz",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "23L-3102",
+      "name": "Muhammad Hassan",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24I-3023",
+      "name": "Ali Saad",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24I-3078",
+      "name": "Muhammad Umar Ashraf",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-2551",
+      "name": "Hamna Faisal",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3003",
+      "name": "Adina Saqib",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Present",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3008",
+      "name": "Eman Fatima",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3010",
+      "name": "Ahmad Abrar",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3011",
+      "name": "Muhammad Moiz Dil",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3012",
+      "name": "Abdul Moez",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3018",
+      "name": "Muhammad Talha Hamid",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3027",
+      "name": "Fatima Kamran",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Late",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3031",
+      "name": "Ahmed Akhtar",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3034",
+      "name": "Muhammad Hammad Mushtaq",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3035",
+      "name": "Muhammad Waleed",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3036",
+      "name": "Bilal Kashif",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3037",
+      "name": "Mahrukh Rehman",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3049",
+      "name": "Ahmad Ali Khan",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3050",
+      "name": "Saad Mehmood Athar",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3051",
+      "name": "Mustafa Salman Ahmed",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3052",
+      "name": "Ramsha Khalid",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3054",
+      "name": "Muhammad Hanzala Siddique",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3057",
+      "name": "Muhammad Shahzaib Zia",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3060",
+      "name": "Muhammad Moeed Amir",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3061",
+      "name": "Abdullah Tahir",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3067",
+      "name": "Sheikh Muhammad Ammar Arif",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3068",
+      "name": "Zuhar Faisal",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3072",
+      "name": "Suleman Ahmed",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3078",
+      "name": "Zainab Sharif",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3079",
+      "name": "Maryam Bint E Ashfaq",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Present",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3081",
+      "name": "Shahzaib Saeed",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3083",
+      "name": "Areeba Iqbal",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Present",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3088",
+      "name": "Kashif Abbas",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3089",
+      "name": "Asadullah Nasir",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3090",
+      "name": "Bilal Ahmad",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3093",
+      "name": "Rabia",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3096",
+      "name": "Anoosha Rizwan Vohra",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    },
+    {
+      "session_id": "SES-1777926059601",
+      "roll_no": "24L-3097",
+      "name": "Manumha Nadeem",
+      "section": "BSE-243A",
+      "course_code": "SE-2001",
+      "status": "Absent",
+      "recorded_at": 1777926059601
+    }
+  ],
+  "scans": {
+    "SES-1777926059601": {
+      "24L-3003": {
+        "opening": true,
+        "closing": true,
+        "firstScanAt": 1777926356739,
+        "secondScanAt": 1777926556774
+      },
+      "24L-3083": {
+        "opening": true,
+        "closing": true,
+        "firstScanAt": 1777926383062,
+        "secondScanAt": 1777926650326
+      },
+      "24L-3079": {
+        "opening": true,
+        "closing": true,
+        "firstScanAt": 1777926409249,
+        "secondScanAt": 1777926516167
+      },
+      "24L-3027": {
+        "opening": false,
+        "closing": true,
+        "firstScanAt": 1777926679550
+      }
+    }
+  }
+}
