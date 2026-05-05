@@ -1,7 +1,7 @@
 {
   "name": "attendance-system",
   "version": "1.0.0",
-  "description": "QR Code Attendance System",
+  "description": "QR Code Attendance System with Excel Export",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -10,6 +10,7 @@
     "dotenv": "^17.4.2",
     "express": "^4.18.2",
     "pg": "^8.20.0",
-    "qrcode": "^1.5.3"
+    "qrcode": "^1.5.3",
+    "xlsx": "^0.18.5"
   }
 }

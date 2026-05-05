@@ -2,6 +2,8 @@ const express = require('express');
 const QRCode = require('qrcode');
 const path = require('path');
 const { Pool } = require('pg');
+const XLSX = require('xlsx');
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
@@ -9,10 +11,9 @@ const app = express();
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// DATABASE SETUP
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
 async function initDatabase() {
@@ -99,26 +100,6 @@ async function initDatabase() {
             console.log('✓ Faculty seeded');
         }
 
-        const studentsRes = await client.query('SELECT COUNT(*) FROM students');
-        if (parseInt(studentsRes.rows[0].count) === 0) {
-            await client.query(`
-                INSERT INTO students (roll_no, name, section, pass) VALUES 
-                ('24L-3001', 'Ahmed Raza', 'BSE-243A', 'pass'),
-                ('24L-3002', 'Sara Khan', 'BSE-243A', 'pass'),
-                ('24L-3003', 'Adina Saqib', 'BSE-243A', 'pass'),
-                ('24L-3027', 'Fatima Kamran', 'BSE-243A', 'pass'),
-                ('24L-3079', 'Maryam Ashfaq', 'BSE-243A', 'pass'),
-                ('24L-3083', 'Areeba Iqbal', 'BSE-243A', 'pass'),
-                ('24L-3010', 'Usman Tariq', 'BSE-243A', 'pass'),
-                ('24L-3015', 'Hina Malik', 'BSE-243A', 'pass'),
-                ('24L-3022', 'Bilal Ahmed', 'BSE-243A', 'pass'),
-                ('24L-3045', 'Zara Hussain', 'BSE-243A', 'pass'),
-                ('24L-3051', 'Ali Hassan', 'BSE-243B', 'pass'),
-                ('24L-3062', 'Noor Fatima', 'BSE-243B', 'pass')
-            `);
-            console.log('✓ Students seeded');
-        }
-
         console.log('✅ Database initialized successfully');
     } catch (err) {
         console.error('Database init error:', err);
@@ -127,47 +108,53 @@ async function initDatabase() {
     }
 }
 
-async function restoreActiveSessions() {
-    const client = await pool.connect();
-    try {
-        const res = await client.query('UPDATE sessions SET locked = true, status = $1 WHERE locked = false RETURNING session_id', ['locked']);
-        if (res.rowCount > 0) console.log(`🔒 ${res.rowCount} stale session(s) locked on restart.`);
-    } catch (err) {
-        console.error('Session restore error:', err);
-    } finally {
-        client.release();
-    }
-}
-
 // IN-MEMORY STORE
 const store = {
-    students: [
-        { rollNo: '24L-3001', name: 'Ahmed Raza', section: 'BSE-243A', pass: 'pass' },
-        { rollNo: '24L-3002', name: 'Sara Khan', section: 'BSE-243A', pass: 'pass' },
-        { rollNo: '24L-3003', name: 'Adina Saqib', section: 'BSE-243A', pass: 'pass' },
-        { rollNo: '24L-3027', name: 'Fatima Kamran', section: 'BSE-243A', pass: 'pass' },
-        { rollNo: '24L-3079', name: 'Maryam Ashfaq', section: 'BSE-243A', pass: 'pass' },
-        { rollNo: '24L-3083', name: 'Areeba Iqbal', section: 'BSE-243A', pass: 'pass' },
-        { rollNo: '24L-3010', name: 'Usman Tariq', section: 'BSE-243A', pass: 'pass' },
-        { rollNo: '24L-3015', name: 'Hina Malik', section: 'BSE-243A', pass: 'pass' },
-        { rollNo: '24L-3022', name: 'Bilal Ahmed', section: 'BSE-243A', pass: 'pass' },
-        { rollNo: '24L-3045', name: 'Zara Hussain', section: 'BSE-243A', pass: 'pass' },
-        { rollNo: '24L-3051', name: 'Ali Hassan', section: 'BSE-243B', pass: 'pass' },
-        { rollNo: '24L-3062', name: 'Noor Fatima', section: 'BSE-243B', pass: 'pass' },
-    ],
-    faculty: [
-        { id: 'FAC-001', name: 'Dr. Zeeshan Ali Rana', dept: 'SE', courses: ['SE-2001', 'SE-3002'], pass: 'admin' },
-        { id: 'FAC-002', name: 'Dr. Aisha Tariq', dept: 'CS', courses: ['CS-3001'], pass: 'admin' },
-    ],
     sessions: {},
     currentToken: {},
     scans: {},
     rotateIntervals: {},
+    lastExport: {},
 };
 
-// UTILITY FUNCTIONS
 const token8 = () => Math.random().toString(36).substring(2, 10).toUpperCase();
 const sesId = () => 'SES-' + Date.now();
+
+async function exportToExcel(sessionId, section) {
+    try {
+        const sessionRes = await pool.query('SELECT * FROM sessions WHERE session_id = $1', [sessionId]);
+        const session = sessionRes.rows[0];
+        if (!session) return null;
+        
+        const recordsRes = await pool.query('SELECT * FROM attendance_records WHERE session_id = $1 ORDER BY roll_no', [sessionId]);
+        const studentsRes = await pool.query('SELECT * FROM students WHERE section = $1 ORDER BY roll_no', [section]);
+        
+        const workbook = XLSX.utils.book_new();
+        const dateStr = new Date(Number(session.started_at)).toLocaleDateString('en-GB');
+        const headers = ['S#', 'Roll No.', 'Student Name', dateStr];
+        const data = [headers];
+        
+        let sno = 1;
+        for (const student of studentsRes.rows) {
+            const record = recordsRes.rows.find(r => r.roll_no === student.roll_no);
+            let status = 'A';
+            if (record) {
+                if (record.status === 'Present') status = 'P';
+                else if (record.status === 'Late') status = 'L';
+            }
+            data.push([sno++, student.roll_no, student.name, status]);
+        }
+        
+        const worksheet = XLSX.utils.aoa_to_sheet(data);
+        worksheet['!cols'] = [{ wch: 5 }, { wch: 12 }, { wch: 30 }, { wch: 15 }];
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance');
+        
+        return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    } catch (err) {
+        console.error('Excel export error:', err);
+        return null;
+    }
+}
 
 async function lockSession(sessionId) {
     const s = store.sessions[sessionId];
@@ -182,17 +169,15 @@ async function lockSession(sessionId) {
         delete store.rotateIntervals[sessionId];
     }
 
-    await pool.query(
-        'UPDATE sessions SET locked = $1, status = $2, locked_at = $3 WHERE session_id = $4',
-        [true, 'locked', s.lockedAt, sessionId]
-    );
+    await pool.query('UPDATE sessions SET locked = $1, status = $2, locked_at = $3 WHERE session_id = $4',
+        [true, 'locked', s.lockedAt, sessionId]);
 
     const studentsRes = await pool.query('SELECT * FROM students WHERE section = $1', [s.section]);
-    const students = studentsRes.rows.map(r => ({ rollNo: r.roll_no, name: r.name, section: r.section }));
+    const students = studentsRes.rows;
     const scans = store.scans[sessionId] || {};
 
     for (const st of students) {
-        const scan = scans[st.rollNo];
+        const scan = scans[st.roll_no];
         let finalStatus = 'Absent';
 
         if (scan) {
@@ -201,41 +186,107 @@ async function lockSession(sessionId) {
             else if (scan.opening) finalStatus = 'Late';
         }
 
-        const ov = (s.overrides || []).find(o => o.rollNo === st.rollNo);
+        const ov = (s.overrides || []).find(o => o.rollNo === st.roll_no);
         if (ov) finalStatus = ov.status;
 
         await pool.query(
             `INSERT INTO attendance_records (session_id, roll_no, name, section, course_code, status, recorded_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7)
              ON CONFLICT (session_id, roll_no) DO UPDATE SET status = $6`,
-            [sessionId, st.rollNo, st.name, st.section, s.courseCode, finalStatus, s.startedAt]
+            [sessionId, st.roll_no, st.name, st.section, s.courseCode, finalStatus, s.startedAt]
         );
     }
-
+    
+    const excelBuffer = await exportToExcel(sessionId, s.section);
+    if (excelBuffer) {
+        if (!fs.existsSync(path.join(__dirname, 'exports'))) fs.mkdirSync(path.join(__dirname, 'exports'));
+        const filename = `attendance_${sessionId}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        fs.writeFileSync(path.join(__dirname, 'exports', filename), excelBuffer);
+        console.log(`📊 Excel export saved: ${filename}`);
+    }
     console.log(`🔒 Session ${sessionId} locked.`);
 }
 
 async function rosterForSession(sessionId) {
     const s = store.sessions[sessionId];
+    if (!s) return [];
     const scans = store.scans[sessionId] || {};
     const studentsRes = await pool.query('SELECT * FROM students WHERE section = $1', [s.section]);
-    const students = studentsRes.rows.map(r => ({ rollNo: r.roll_no, name: r.name, section: r.section }));
-
-    return students.map(st => {
-        const scan = scans[st.rollNo];
+    
+    return studentsRes.rows.map(st => {
+        const scan = scans[st.roll_no];
         let status = 'Absent';
-
         if (scan) {
             if (scan.opening && scan.closing) status = 'Present';
             else if (scan.closing) status = 'Late';
             else if (scan.opening) status = 'Opening Recorded';
         }
-
-        const ov = (s.overrides || []).find(o => o.rollNo === st.rollNo);
-        if (ov) status = ov.status + ' (override)';
-
-        return { ...st, status, scanned: !!scan };
+        const ov = (s.overrides || []).find(o => o.rollNo === st.roll_no);
+        if (ov) status = ov.status;
+        return { rollNo: st.roll_no, name: st.name, status };
     });
+}
+
+// RESTORE ACTIVE SESSIONS FUNCTION - FIXED
+async function restoreActiveSessions() {
+    try {
+        const res = await pool.query('SELECT session_id FROM sessions WHERE locked = false');
+        for (const row of res.rows) {
+            // Rebuild session in memory from database
+            const sessionRes = await pool.query('SELECT * FROM sessions WHERE session_id = $1', [row.session_id]);
+            const sessionData = sessionRes.rows[0];
+            if (sessionData) {
+                const tokenRes = await pool.query('SELECT * FROM current_tokens WHERE session_id = $1', [row.session_id]);
+                const tokenData = tokenRes.rows[0];
+                
+                store.sessions[row.session_id] = {
+                    sessionId: sessionData.session_id,
+                    topic: sessionData.topic,
+                    courseCode: sessionData.course_code,
+                    section: sessionData.section,
+                    facultyId: sessionData.faculty_id,
+                    facultyName: sessionData.faculty_name,
+                    startedAt: sessionData.started_at,
+                    status: sessionData.status,
+                    locked: sessionData.locked,
+                    overrides: sessionData.overrides || []
+                };
+                
+                if (tokenData) {
+                    store.currentToken[row.session_id] = {
+                        token: tokenData.token,
+                        generatedAt: tokenData.generated_at,
+                        expiresAt: tokenData.expires_at
+                    };
+                }
+                
+                store.scans[row.session_id] = {};
+                const scansRes = await pool.query('SELECT * FROM scans WHERE session_id = $1', [row.session_id]);
+                for (const scan of scansRes.rows) {
+                    store.scans[row.session_id][scan.roll_no] = {
+                        opening: scan.opening,
+                        closing: scan.closing,
+                        firstScanAt: scan.first_scan_at,
+                        secondScanAt: scan.second_scan_at
+                    };
+                }
+                
+                console.log(`🔄 Restored session: ${row.session_id} (${sessionData.status})`);
+            }
+        }
+        console.log('✅ Active sessions restored');
+    } catch (err) {
+        console.error('Session restore error:', err);
+    }
+}
+
+async function getActiveSessionForFaculty(facultyId) {
+    for (const [id, session] of Object.entries(store.sessions)) {
+        if (session.facultyId === facultyId && !session.locked) {
+            return { sessionId: id, ...session };
+        }
+    }
+    return null;
 }
 
 // ============ FACULTY ROUTES ============
@@ -244,104 +295,142 @@ app.post('/api/faculty/login', async (req, res) => {
     try {
         const { id, pass } = req.body;
         const dbRes = await pool.query('SELECT * FROM faculty WHERE id = $1 AND pass = $2', [id, pass]);
+        if (!dbRes.rows[0]) return res.status(401).json({ error: 'Invalid credentials' });
         const f = dbRes.rows[0];
-        if (!f) return res.status(401).json({ error: 'Invalid credentials' });
-        res.json({ id: f.id, name: f.name, dept: f.dept, courses: f.courses });
+        
+        const activeSession = await getActiveSessionForFaculty(id);
+        
+        res.json({ 
+            id: f.id, name: f.name, dept: f.dept, courses: f.courses,
+            activeSession: activeSession ? {
+                sessionId: activeSession.sessionId,
+                topic: activeSession.topic,
+                status: activeSession.status,
+                startedAt: activeSession.startedAt
+            } : null
+        });
     } catch (err) {
-        console.error('Faculty login error:', err);
-        res.status(500).json({ error: 'Server error. Please try again.' });
+        res.status(500).json({ error: 'Server error' });
     }
 });
 
 app.post('/api/faculty/start-session', async (req, res) => {
     try {
-    const { topic, courseCode, section, facultyId, facultyName, sessionDate } = req.body;
-    if (!topic || !courseCode || !section) {
-        return res.status(400).json({ error: 'Missing fields' });
-    }
+        const { topic, courseCode, section, facultyId, facultyName } = req.body;
+        if (!topic || !courseCode || !section) return res.status(400).json({ error: 'Missing fields' });
 
-    const sessionId = sesId();
-    const tok = token8();
-    const tokenNow = Date.now();
-    const startedAt = tokenNow;
+        const sessionId = sesId();
+        const tok = token8();
+        const tokenNow = Date.now();
 
-    store.sessions[sessionId] = {
-        sessionId, topic, courseCode, section, facultyId, facultyName,
-        startedAt, status: 'opening', locked: false, overrides: []
-    };
-    store.currentToken[sessionId] = { token: tok, generatedAt: tokenNow, expiresAt: tokenNow + 30000 };
-    store.scans[sessionId] = {};
+        store.sessions[sessionId] = {
+            sessionId, topic, courseCode, section, facultyId, facultyName,
+            startedAt: tokenNow, status: 'opening', locked: false, overrides: []
+        };
+        store.currentToken[sessionId] = { token: tok, generatedAt: tokenNow, expiresAt: tokenNow + 30000 };
+        store.scans[sessionId] = {};
 
-    await pool.query(
-        `INSERT INTO sessions (session_id, topic, course_code, section, faculty_id, faculty_name, started_at, locked, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [sessionId, topic, courseCode, section, facultyId, facultyName, startedAt, false, 'opening']
-    );
-    await pool.query(
-        `INSERT INTO current_tokens (session_id, token, generated_at, expires_at)
-         VALUES ($1, $2, $3, $4)`,
-        [sessionId, tok, tokenNow, tokenNow + 30000]
-    );
-
-    setTimeout(() => {
-        const s = store.sessions[sessionId];
-        if (s && !s.locked) {
-            s.status = 'closing';
-            pool.query('UPDATE sessions SET status = $1 WHERE session_id = $2', ['closing', sessionId]);
-        }
-    }, 10 * 60 * 1000);
-
-    setTimeout(() => lockSession(sessionId), 20 * 60 * 1000);
-
-    store.rotateIntervals[sessionId] = setInterval(async () => {
-        const s = store.sessions[sessionId];
-        if (!s || s.locked) {
-            clearInterval(store.rotateIntervals[sessionId]);
-            return;
-        }
-        const nt = token8();
-        const now2 = Date.now();
-        store.currentToken[sessionId] = { token: nt, generatedAt: now2, expiresAt: now2 + 30000 };
         await pool.query(
-            `UPDATE current_tokens SET token = $1, generated_at = $2, expires_at = $3 WHERE session_id = $4`,
-            [nt, now2, now2 + 30000, sessionId]
+            `INSERT INTO sessions (session_id, topic, course_code, section, faculty_id, faculty_name, started_at, locked, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            [sessionId, topic, courseCode, section, facultyId, facultyName, tokenNow, false, 'opening']
         );
-    }, 30000);
+        await pool.query(`INSERT INTO current_tokens VALUES ($1, $2, $3, $4)`, [sessionId, tok, tokenNow, tokenNow + 30000]);
 
-    const qrData = `${sessionId}|${tok}`;
-    const qrImg = await QRCode.toDataURL(qrData, { width: 300, margin: 2 });
-    res.json({ sessionId, token: tok, qrCode: qrImg, expiresAt: tokenNow + 30000 });
+        store.rotateIntervals[sessionId] = setInterval(async () => {
+            const s = store.sessions[sessionId];
+            if (!s || s.locked) { clearInterval(store.rotateIntervals[sessionId]); return; }
+            const nt = token8();
+            const now2 = Date.now();
+            store.currentToken[sessionId] = { token: nt, generatedAt: now2, expiresAt: now2 + 30000 };
+            await pool.query(`UPDATE current_tokens SET token = $1, generated_at = $2, expires_at = $3 WHERE session_id = $4`,
+                [nt, now2, now2 + 30000, sessionId]);
+        }, 30000);
+
+        const qrImg = await QRCode.toDataURL(`${sessionId}|${tok}`, { width: 300, margin: 2 });
+        res.json({ sessionId, token: tok, qrCode: qrImg, expiresAt: tokenNow + 30000 });
     } catch (err) {
-        console.error('Start session error:', err);
-        res.status(500).json({ error: 'Server error. Please try again.' });
+        console.error('Start error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/faculty/resume-session/:sessionId', async (req, res) => {
+    try {
+        const sessionId = req.params.sessionId;
+        const s = store.sessions[sessionId];
+        
+        if (!s) return res.status(404).json({ error: 'Session not found' });
+        if (s.locked) return res.status(400).json({ error: 'Session already locked' });
+        
+        const td = store.currentToken[sessionId];
+        const qrImg = await QRCode.toDataURL(`${sessionId}|${td.token}`, { width: 300, margin: 2 });
+        
+        res.json({ 
+            sessionId, token: td.token, qrCode: qrImg, expiresAt: td.expiresAt,
+            status: s.status, topic: s.topic, courseCode: s.courseCode, section: s.section
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/faculty/lock-opening/:sessionId', async (req, res) => {
+    try {
+        const sessionId = req.params.sessionId;
+        const s = store.sessions[sessionId];
+        
+        if (!s) return res.status(404).json({ error: 'Session not found' });
+        if (s.locked) return res.status(400).json({ error: 'Session already locked' });
+        
+        s.status = 'opening_locked';
+        await pool.query('UPDATE sessions SET status = $1 WHERE session_id = $2', ['opening_locked', sessionId]);
+        
+        res.json({ success: true, status: s.status });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/faculty/start-closing/:sessionId', async (req, res) => {
+    try {
+        const sessionId = req.params.sessionId;
+        const s = store.sessions[sessionId];
+        
+        if (!s) return res.status(404).json({ error: 'Session not found' });
+        if (s.locked) return res.status(400).json({ error: 'Session already locked' });
+        
+        s.status = 'closing';
+        await pool.query('UPDATE sessions SET status = $1 WHERE session_id = $2', ['closing', sessionId]);
+        
+        res.json({ success: true, status: s.status });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 
 app.get('/api/faculty/session/:sessionId', async (req, res) => {
     try {
-        const { sessionId } = req.params;
-        const s = store.sessions[sessionId];
+        const s = store.sessions[req.params.sessionId];
         if (!s) return res.status(404).json({ error: 'Not found' });
 
-        const td = store.currentToken[sessionId];
-        const roster = await rosterForSession(sessionId);
+        const td = store.currentToken[req.params.sessionId];
+        const roster = await rosterForSession(req.params.sessionId);
         let qrCode = null;
 
         if (td && !s.locked) {
-            const qrData = `${sessionId}|${td.token}`;
-            qrCode = await QRCode.toDataURL(qrData, { width: 300, margin: 2 });
+            qrCode = await QRCode.toDataURL(`${req.params.sessionId}|${td.token}`, { width: 300, margin: 2 });
         }
 
         res.json({
-            session: s, token: td?.token, expiresAt: td?.expiresAt, serverTime: Date.now(),
+            session: s, token: td?.token, expiresAt: td?.expiresAt,
             qrCode, roster,
-            presentCount: roster.filter(r => r.status.startsWith('Present')).length,
+            presentCount: roster.filter(r => r.status === 'Present').length,
             lateCount: roster.filter(r => r.status === 'Late').length,
             absentCount: roster.filter(r => r.status === 'Absent').length,
         });
     } catch (err) {
-        console.error('Poll session error:', err);
-        res.status(500).json({ error: 'Server error.' });
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -350,67 +439,53 @@ app.post('/api/faculty/lock-session/:sessionId', async (req, res) => {
         await lockSession(req.params.sessionId);
         res.json({ success: true });
     } catch (err) {
-        console.error('Lock session error:', err);
-        res.status(500).json({ error: 'Server error.' });
+        res.status(500).json({ error: err.message });
     }
 });
-
-app.post('/api/faculty/closing-window/:sessionId', async (req, res) => {
+app.get('/api/faculty/token/:sessionId', async (req, res) => {
     try {
-        const s = store.sessions[req.params.sessionId];
-        if (s && !s.locked) {
-            s.status = 'closing';
-            await pool.query('UPDATE sessions SET status = $1 WHERE session_id = $2', ['closing', req.params.sessionId]);
-        }
-        res.json({ success: true });
+        const sessionId = req.params.sessionId;
+        const td = store.currentToken[sessionId];
+        if (!td) return res.status(404).json({ error: 'No active token' });
+        
+        const qrImg = await QRCode.toDataURL(`${sessionId}|${td.token}`, { width: 300, margin: 2 });
+        res.json({ token: td.token, qrCode: qrImg, expiresAt: td.expiresAt });
     } catch (err) {
-        console.error('Closing window error:', err);
-        res.status(500).json({ error: 'Server error.' });
+        res.status(500).json({ error: err.message });
     }
 });
-
 app.post('/api/faculty/override/:sessionId', async (req, res) => {
     try {
-        const { rollNo, status, reason } = req.body;
+        const { rollNo, status } = req.body;
         const s = store.sessions[req.params.sessionId];
         if (!s) return res.status(404).json({ error: 'Not found' });
         s.overrides = (s.overrides || []).filter(o => o.rollNo !== rollNo);
-        s.overrides.push({ rollNo, status, reason, at: Date.now() });
-        await pool.query(
-            'UPDATE sessions SET overrides = $1 WHERE session_id = $2',
-            [JSON.stringify(s.overrides), req.params.sessionId]
-        );
+        s.overrides.push({ rollNo, status, at: Date.now() });
+        await pool.query('UPDATE sessions SET overrides = $1 WHERE session_id = $2', [JSON.stringify(s.overrides), req.params.sessionId]);
         res.json({ success: true });
     } catch (err) {
-        console.error('Override error:', err);
-        res.status(500).json({ error: 'Server error.' });
+        res.status(500).json({ error: err.message });
     }
 });
 
 app.get('/api/faculty/history', async (req, res) => {
     try {
         const { facultyId } = req.query;
-        const facRes = await pool.query('SELECT * FROM faculty WHERE id = $1', [facultyId]);
-        const fac = facRes.rows[0];
+        const fac = (await pool.query('SELECT * FROM faculty WHERE id = $1', [facultyId])).rows[0];
         if (!fac) return res.status(404).json({ error: 'Faculty not found' });
 
-        const sessionsRes = await pool.query(
+        const sessions = (await pool.query(
             `SELECT * FROM sessions WHERE locked = true AND course_code = ANY($1::text[]) ORDER BY started_at DESC`,
             [fac.courses]
-        );
+        )).rows;
 
         const locked = [];
-        for (const s of sessionsRes.rows) {
-            const recordsRes = await pool.query(
-                'SELECT * FROM attendance_records WHERE session_id = $1', [s.session_id]
-            );
-            const records = recordsRes.rows.map(r => ({
-                rollNo: r.roll_no, name: r.name, section: r.section, status: r.status,
-            }));
+        for (const s of sessions) {
+            const records = (await pool.query('SELECT * FROM attendance_records WHERE session_id = $1', [s.session_id])).rows;
             locked.push({
-                sessionId: s.session_id, topic: s.topic, courseCode: s.course_code,
-                section: s.section, facultyName: s.faculty_name, startedAt: s.started_at,
-                records,
+                sessionId: s.session_id, topic: s.topic || 'No topic', courseCode: s.course_code || 'N/A',
+                section: s.section || 'N/A', facultyName: s.faculty_name || 'Unknown', startedAt: s.started_at,
+                records: records.map(r => ({ rollNo: r.roll_no, name: r.name, status: r.status })),
                 present: records.filter(r => r.status === 'Present').length,
                 late: records.filter(r => r.status === 'Late').length,
                 absent: records.filter(r => r.status === 'Absent').length,
@@ -420,130 +495,23 @@ app.get('/api/faculty/history', async (req, res) => {
         res.json(locked);
     } catch (err) {
         console.error('History error:', err);
-        res.status(500).json({ error: 'Server error.' });
+        res.status(500).json({ error: err.message });
     }
 });
 
-// ============ EDIT ENDPOINTS ============
-
-app.patch('/api/faculty/session/:sessionId/meta', async (req, res) => {
-    const { sessionId } = req.params;
-    const { topic, courseCode, section } = req.body;
-
+app.get('/api/faculty/export/:sessionId', async (req, res) => {
     try {
-        const dbCheck = await pool.query('SELECT session_id FROM sessions WHERE session_id = $1', [sessionId]);
-        if (dbCheck.rows.length === 0) {
-            return res.status(404).json({ error: 'Session not found in database' });
-        }
-
-        await pool.query(
-            'UPDATE sessions SET topic = $1, course_code = $2, section = $3 WHERE session_id = $4',
-            [topic, courseCode, section, sessionId]
-        );
-
-        if (store.sessions[sessionId]) {
-            if (topic) store.sessions[sessionId].topic = topic;
-            if (courseCode) store.sessions[sessionId].courseCode = courseCode;
-            if (section) store.sessions[sessionId].section = section;
-        }
-
-        res.json({ success: true, message: 'Metadata updated' });
+        const session = (await pool.query('SELECT * FROM sessions WHERE session_id = $1', [req.params.sessionId])).rows[0];
+        if (!session) return res.status(404).json({ error: 'Session not found' });
+        
+        const buffer = await exportToExcel(req.params.sessionId, session.section);
+        const filename = `Attendance_${session.course_code}_${new Date(Number(session.started_at)).toLocaleDateString('en-GB').replace(/\//g, '-')}.xlsx`;
+        
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
     } catch (err) {
-        console.error('DB update error:', err);
-        res.status(500).json({ error: 'Database error: ' + err.message });
-    }
-});
-
-app.patch('/api/faculty/session/:sessionId/record', async (req, res) => {
-    const { sessionId } = req.params;
-    const { rollNo, status } = req.body;
-
-    try {
-        // Step 1: try to update the existing row
-        const updateResult = await pool.query(
-            'UPDATE attendance_records SET status = $1 WHERE session_id = $2 AND roll_no = $3',
-            [status, sessionId, rollNo]
-        );
-
-        // Step 2: if no row existed yet, look up student and session separately then insert
-        if (updateResult.rowCount === 0) {
-            const studentRes = await pool.query(
-                'SELECT name, section FROM students WHERE roll_no = $1',
-                [rollNo]
-            );
-            const sessionRes = await pool.query(
-                'SELECT course_code, started_at FROM sessions WHERE session_id = $1',
-                [sessionId]
-            );
-
-            if (studentRes.rows.length === 0 || sessionRes.rows.length === 0) {
-                return res.status(404).json({ error: 'Student or session not found' });
-            }
-
-            const { name, section } = studentRes.rows[0];
-            const { course_code, started_at } = sessionRes.rows[0];
-
-            await pool.query(
-                'INSERT INTO attendance_records (session_id, roll_no, name, section, course_code, status, recorded_at) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (session_id, roll_no) DO UPDATE SET status = EXCLUDED.status',
-                [sessionId, rollNo, name, section, course_code, status, started_at]
-            );
-        }
-
-        res.json({ success: true, message: 'Record updated' });
-    } catch (err) {
-        console.error('DB update error:', err);
-        res.status(500).json({ error: 'Database error: ' + err.message });
-    }
-});
-
-
-// Batch update all attendance records for a session in one transactional request
-app.patch('/api/faculty/session/:sessionId/records-batch', async (req, res) => {
-    const { sessionId } = req.params;
-    const { records } = req.body;
-
-    if (!Array.isArray(records) || records.length === 0) {
-        return res.status(400).json({ error: 'records array is required' });
-    }
-
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-
-        for (const { rollNo, status } of records) {
-            const updateResult = await client.query(
-                'UPDATE attendance_records SET status = $1 WHERE session_id = $2 AND roll_no = $3',
-                [status, sessionId, rollNo]
-            );
-
-            if (updateResult.rowCount === 0) {
-                const studentRes = await client.query(
-                    'SELECT name, section FROM students WHERE roll_no = $1',
-                    [rollNo]
-                );
-                const sessionRes = await client.query(
-                    'SELECT course_code, started_at FROM sessions WHERE session_id = $1',
-                    [sessionId]
-                );
-                if (studentRes.rows.length > 0 && sessionRes.rows.length > 0) {
-                    const { name, section } = studentRes.rows[0];
-                    const { course_code, started_at } = sessionRes.rows[0];
-                    await client.query(
-                        'INSERT INTO attendance_records (session_id, roll_no, name, section, course_code, status, recorded_at) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (session_id, roll_no) DO UPDATE SET status = EXCLUDED.status',
-                        [sessionId, rollNo, name, section, course_code, status, started_at]
-                    );
-                }
-            }
-        }
-
-        await client.query('COMMIT');
-        res.json({ success: true, updated: records.length });
-    } catch (err) {
-        await client.query('ROLLBACK');
-        console.error('Batch update error:', err);
-        res.status(500).json({ error: 'Database error: ' + err.message });
-    } finally {
-        client.release();
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -552,21 +520,12 @@ app.patch('/api/faculty/session/:sessionId/records-batch', async (req, res) => {
 app.post('/api/student/login', async (req, res) => {
     try {
         const { rollNo, pass } = req.body;
-        const dbRes = await pool.query('SELECT * FROM students WHERE roll_no = $1 AND pass = $2', [rollNo.toUpperCase(), pass]);
-        const student = dbRes.rows[0];
-        if (!student) return res.status(401).json({ error: 'Invalid roll number or password' });
+        const student = (await pool.query('SELECT * FROM students WHERE roll_no = $1 AND pass = $2', [rollNo.toUpperCase(), pass])).rows[0];
+        if (!student) return res.status(401).json({ error: 'Invalid credentials' });
         res.json({ rollNo: student.roll_no, name: student.name, section: student.section });
     } catch (err) {
-        console.error('Student login error:', err);
-        res.status(500).json({ error: 'Server error. Please try again.' });
+        res.status(500).json({ error: err.message });
     }
-});
-
-app.get('/api/student/:rollNo', async (req, res) => {
-    const dbRes = await pool.query('SELECT * FROM students WHERE roll_no = $1', [req.params.rollNo]);
-    const student = dbRes.rows[0];
-    if (!student) return res.status(404).json({ error: 'Student not found' });
-    res.json(student);
 });
 
 app.get('/api/sessions', (req, res) => {
@@ -574,124 +533,101 @@ app.get('/api/sessions', (req, res) => {
 });
 
 app.post('/api/student/scan', async (req, res) => {
-  try {
-    const { rollNo, sessionId, token } = req.body;
-    const studentRes = await pool.query('SELECT * FROM students WHERE roll_no = $1', [rollNo]);
-    if (!studentRes.rows[0]) return res.status(404).json({ error: 'Roll number not found' });
+    try {
+        const { rollNo, sessionId, token } = req.body;
+        const student = (await pool.query('SELECT * FROM students WHERE roll_no = $1', [rollNo])).rows[0];
+        if (!student) return res.status(404).json({ error: 'Roll number not found' });
 
-    const s = store.sessions[sessionId];
-    if (!s) return res.status(404).json({ error: 'Session not found' });
-    if (s.locked) return res.status(400).json({ error: 'Session is locked. Cannot record attendance.', code: 'LOCKED' });
+        const s = store.sessions[sessionId];
+        if (!s) return res.status(404).json({ error: 'Session not found' });
+        if (s.locked) return res.status(400).json({ error: 'Session locked', code: 'LOCKED' });
+        if (s.status === 'opening_locked') return res.status(400).json({ error: 'Opening window closed. Wait for closing window.', code: 'OPENING_LOCKED' });
 
-    const td = store.currentToken[sessionId];
-    if (!td) return res.status(400).json({ error: 'No active token', code: 'NO_TOKEN' });
+        const td = store.currentToken[sessionId];
+        if (!td) return res.status(400).json({ error: 'No active token' });
+        if (token !== td.token) return res.status(400).json({ error: 'Invalid or expired token', code: 'EXPIRED' });
+        if (Date.now() > td.expiresAt) return res.status(400).json({ error: 'Token expired', code: 'EXPIRED' });
 
-    if (token !== td.token) {
-        return res.status(400).json({
-            error: 'QR code expired or invalid. Please scan the current code on the projector.',
-            code: 'EXPIRED'
-        });
-    }
-
-    if (Date.now() > td.expiresAt) {
-        return res.status(400).json({ error: 'Token has expired. Please scan the new QR code.', code: 'EXPIRED' });
-    }
-
-    if (!store.scans[sessionId]) store.scans[sessionId] = {};
-    const existing = store.scans[sessionId][rollNo];
-
-    if (existing && existing.opening && existing.closing) {
-        return res.status(400).json({ error: 'Attendance already fully recorded for this session.', code: 'DUPLICATE' });
-    }
-
-    const isClosing = s.status === 'closing';
-
-    if (!existing) {
-        store.scans[sessionId][rollNo] = {
-            opening: !isClosing,
-            closing: isClosing,
-            firstScanAt: Date.now()
-        };
-        await pool.query(
-            `INSERT INTO scans (session_id, roll_no, opening, closing, first_scan_at)
-             VALUES ($1, $2, $3, $4, $5)
-             ON CONFLICT (session_id, roll_no) DO UPDATE SET opening = $3, closing = $4`,
-            [sessionId, rollNo, !isClosing, isClosing, Date.now()]
-        );
-    } else {
-        if (!isClosing) {
-            return res.status(400).json({
-                error: 'Opening window already recorded. Scan again during the closing window.',
-                code: 'DUPLICATE_OPENING'
-            });
+        if (!store.scans[sessionId]) store.scans[sessionId] = {};
+        
+        const isClosing = s.status === 'closing';
+        const existingScan = store.scans[sessionId][rollNo];
+        
+        if (existingScan?.opening && existingScan?.closing) {
+            return res.status(400).json({ error: 'Attendance already recorded', code: 'DUPLICATE' });
         }
-        store.scans[sessionId][rollNo].closing = true;
-        store.scans[sessionId][rollNo].secondScanAt = Date.now();
-        await pool.query(
-            `UPDATE scans SET closing = $1, second_scan_at = $2 WHERE session_id = $3 AND roll_no = $4`,
-            [true, Date.now(), sessionId, rollNo]
-        );
+        
+        let currentStatus = '';
+        let message = '';
+        
+        if (!existingScan) {
+            if (isClosing) {
+                store.scans[sessionId][rollNo] = { opening: false, closing: true, firstScanAt: Date.now() };
+                await pool.query(`INSERT INTO scans (session_id, roll_no, opening, closing, first_scan_at) VALUES ($1, $2, $3, $4, $5)`, [sessionId, rollNo, false, true, Date.now()]);
+                currentStatus = 'Late';
+                message = '⏰ You are marked LATE (scanned only during closing window)';
+            } else {
+                store.scans[sessionId][rollNo] = { opening: true, closing: false, firstScanAt: Date.now() };
+                await pool.query(`INSERT INTO scans (session_id, roll_no, opening, closing, first_scan_at) VALUES ($1, $2, $3, $4, $5)`, [sessionId, rollNo, true, false, Date.now()]);
+                currentStatus = 'Opening Recorded';
+                message = '📝 Opening recorded! Please scan again during closing window (10 minutes) to be marked PRESENT.';
+            }
+        } else {
+            if (!isClosing) {
+                return res.status(400).json({ error: 'Already recorded opening. Please scan during closing window.', code: 'WAIT_FOR_CLOSING' });
+            }
+            if (!existingScan.opening) {
+                return res.status(400).json({ error: 'Cannot mark attendance. Please contact faculty.', code: 'INVALID' });
+            }
+            existingScan.closing = true;
+            existingScan.secondScanAt = Date.now();
+            await pool.query(`UPDATE scans SET closing = $1, second_scan_at = $2 WHERE session_id = $3 AND roll_no = $4`, [true, Date.now(), sessionId, rollNo]);
+            currentStatus = 'Present';
+            message = '✅ You are marked PRESENT! (scanned in both windows)';
+        }
+        
+        res.json({ success: true, currentStatus, message, window: isClosing ? 'closing' : 'opening' });
+    } catch (err) {
+        console.error('Scan error:', err);
+        res.status(500).json({ error: err.message });
     }
-
-    const scan = store.scans[sessionId][rollNo];
-    let currentStatus = '';
-    if (scan.opening && scan.closing) currentStatus = 'Present';
-    else if (scan.closing) currentStatus = 'Late';
-    else currentStatus = 'Opening Recorded';
-
-    const messages = {
-        'Present': '✅ You are marked PRESENT.',
-        'Late': '⏰ You are marked LATE.',
-        'Opening Recorded': '📝 Opening window recorded. Scan again during closing window to confirm Present.'
-    };
-
-    res.json({ success: true, currentStatus, message: messages[currentStatus], window: isClosing ? 'closing' : 'opening' });
-  } catch (err) {
-      console.error('Scan error:', err);
-      res.status(500).json({ error: 'Server error. Please try again.' });
-  }
 });
 
 app.get('/api/student/:rollNo/attendance', async (req, res) => {
     try {
-        const { rollNo } = req.params;
-        const { courseCode } = req.query;
-
-        const dbRes = courseCode
-            ? await pool.query(
-                'SELECT * FROM attendance_records WHERE roll_no = $1 AND course_code = $2 ORDER BY recorded_at DESC',
-                [rollNo, courseCode])
-            : await pool.query(
-                'SELECT * FROM attendance_records WHERE roll_no = $1 ORDER BY recorded_at DESC',
-                [rollNo]);
-
-        const records = dbRes.rows.map(r => ({
-            sessionId: r.session_id, date: r.recorded_at, status: r.status, courseCode: r.course_code
-        }));
-
+        const records = (await pool.query('SELECT * FROM attendance_records WHERE roll_no = $1 ORDER BY recorded_at DESC', [req.params.rollNo])).rows;
         const total = records.length;
         const present = records.filter(r => r.status === 'Present').length;
         const late = records.filter(r => r.status === 'Late').length;
         const absent = records.filter(r => r.status === 'Absent').length;
         const pct = total ? Math.round(((present + late) / total) * 100) : 0;
-
-        res.json({ records, total, present, late, absent, pct });
+        
+        res.json({ 
+            records: records.map(r => ({ sessionId: r.session_id, date: r.recorded_at, status: r.status, courseCode: r.course_code })),
+            total, present, late, absent, pct
+        });
     } catch (err) {
-        console.error('Attendance history error:', err);
-        res.status(500).json({ error: 'Server error.' });
+        res.status(500).json({ error: err.message });
     }
 });
 
 // ============ START SERVER ============
-initDatabase().then(() => restoreActiveSessions());
+async function startServer() {
+    await initDatabase();
+    await restoreActiveSessions();
+    if (!fs.existsSync(path.join(__dirname, 'exports'))) fs.mkdirSync(path.join(__dirname, 'exports'));
+    
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log('\n══════════════════════════════════════════');
+        console.log('  FLEX Attendance System');
+        console.log('══════════════════════════════════════════');
+        console.log(`  http://localhost:${PORT}`);
+        console.log(`  Faculty → http://localhost:${PORT}/faculty.html`);
+        console.log(`  Student → http://localhost:${PORT}/student.html`);
+        console.log('══════════════════════════════════════════\n');
+    });
+}
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', async () => {
-    console.log('\n══════════════════════════════════════════');
-    console.log('  FLEX Attendance System');
-    console.log('══════════════════════════════════════════');
-    console.log(`  http://localhost:${PORT}`);
-    console.log(`  Faculty → http://localhost:${PORT}/faculty.html`);
-    console.log(`  Student → http://localhost:${PORT}/student.html`);
-    console.log('══════════════════════════════════════════\n');
-});
+
+startServer();
