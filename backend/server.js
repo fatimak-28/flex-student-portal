@@ -3,11 +3,19 @@ const QRCode = require('qrcode');
 const path = require('path');
 const { Pool } = require('pg');
 const XLSX = require('xlsx');
+const multer = require('multer');
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
 app.use(express.json());
 app.use(express.static(__dirname));
+
+// Configure multer for file uploads
+const upload = multer({ dest: 'uploads/' });
+
+// Create uploads directory if it doesn't exist
+if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -87,22 +95,11 @@ async function initDatabase() {
         if (parseInt(facultyRes.rows[0].count) === 0) {
             await client.query(`
                 INSERT INTO faculty (id, name, dept, pass, courses) VALUES
-                ('FAC-001', 'Dr. Zeeshan Ali Rana', 'SE', 'admin', ARRAY['SE-2001', 'SE-3002']),
-                ('FAC-002', 'Dr. Aisha Tariq', 'CS', 'admin', ARRAY['CS-3001'])
+                ('FAC-001', 'Dr. Zeeshan Ali Rana', 'SE', 'admin', ARRAY['SE-2001', 'SE-3002'])
             `);
             console.log('✓ Faculty seeded');
         }
-        const studentsRes = await client.query('SELECT COUNT(*) FROM students');
-        if (parseInt(studentsRes.rows[0].count) === 0) {
-            await client.query(`
-                INSERT INTO students (roll_no, name, section, pass) VALUES
-                ('24L-3003', 'Adina Saqib', 'BSE-243A', 'pass'),
-                ('24L-3027', 'Fatima Kamran', 'BSE-243A', 'pass'),
-                ('24L-3079', 'Maryam Ashfaq', 'BSE-243A', 'pass'),
-                ('24L-3083', 'Areeba Iqbal', 'BSE-243A', 'pass')
-            `);
-            console.log('✓ Students seeded');
-        }
+        
         console.log('✅ Database ready');
     } catch (err) {
         console.error('DB init error:', err);
@@ -172,11 +169,287 @@ async function lockSession(sessionId) {
         await pool.query(
             `INSERT INTO attendance_records (session_id, roll_no, name, section, course_code, status, recorded_at)
              VALUES ($1,$2,$3,$4,$5,$6,$7)
-             ON CONFLICT (session_id, roll_no) DO NOTHING`,
+             ON CONFLICT (session_id, roll_no) DO UPDATE SET status=$6`,
             [sessionId, st.roll_no, st.name, st.section, s.courseCode, finalStatus, s.startedAt]
         );
     }
+    
     console.log(`🔒 Session ${sessionId} locked.`);
+}
+
+// Function to create/update attendance Excel sheet (without overwriting existing data)
+async function exportAttendanceToExcel(section, courseCode) {
+    // Get locked sessions
+    let sessionsQuery = 'SELECT * FROM sessions WHERE locked=true';
+    const params = [];
+    if (section) { params.push(section); sessionsQuery += ` AND section=$${params.length}`; }
+    if (courseCode) { params.push(courseCode); sessionsQuery += ` AND course_code=$${params.length}`; }
+    sessionsQuery += ' ORDER BY started_at ASC';
+    
+    const sessionsRes = await pool.query(sessionsQuery, params);
+    const sessions = sessionsRes.rows;
+    
+    // Get students
+    let studentsRes;
+    if (section) {
+        studentsRes = await pool.query('SELECT * FROM students WHERE section=$1 ORDER BY roll_no', [section]);
+    } else {
+        studentsRes = await pool.query('SELECT * FROM students ORDER BY roll_no');
+    }
+    
+    // Get attendance records
+    const sessionIds = sessions.map(s => s.session_id);
+    let allRecords = [];
+    if (sessionIds.length > 0) {
+        const recRes = await pool.query(
+            `SELECT * FROM attendance_records WHERE session_id = ANY($1::text[])`,
+            [sessionIds]
+        );
+        allRecords = recRes.rows;
+    }
+    
+    // Build record map
+    const recordMap = {};
+    for (const rec of allRecords) {
+        if (!recordMap[rec.session_id]) recordMap[rec.session_id] = {};
+        recordMap[rec.session_id][rec.roll_no] = rec;
+    }
+    
+    // Create date headers
+    const sessionDates = sessions.map(s => {
+        const d = new Date(Number(s.started_at));
+        return d.toLocaleDateString('en-GB');
+    });
+    
+    // Build data rows
+    const headers = ['S#', 'Roll No.', 'Student Name', ...sessionDates];
+    const dataRows = [headers];
+    let sno = 1;
+    
+    for (const student of studentsRes.rows) {
+        const row = [sno++, student.roll_no, student.name];
+        for (const session of sessions) {
+            const record = recordMap[session.session_id]?.[student.roll_no];
+            let status = 'A';
+            if (record) {
+                if (record.status === 'Present') status = 'P';
+                else if (record.status === 'Late') status = 'L';
+            }
+            row.push(status);
+        }
+        dataRows.push(row);
+    }
+    
+    const ws = XLSX.utils.aoa_to_sheet(dataRows);
+    ws['!cols'] = [{ wch: 5 }, { wch: 14 }, { wch: 30 }];
+    for (let i = 0; i < sessionDates.length; i++) {
+        ws['!cols'].push({ wch: 13 });
+    }
+    
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
+    
+    const filename = `Attendance_${courseCode || 'All'}_${section || 'All'}_${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}.xlsx`;
+    return { buffer: XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }), filename };
+}
+
+// Intelligent import function - creates date columns if they don't exist
+async function importAttendanceFromExcel(filePath, section, courseCode, selectedDates) {
+    if (!fs.existsSync(filePath)) {
+        return { success: false, message: 'File not found' };
+    }
+    
+    try {
+        const wb = XLSX.readFile(filePath);
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        let rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+        
+        if (!rows || rows.length < 2) {
+            return { success: false, message: 'Empty sheet' };
+        }
+        
+        let headers = [...rows[0]];
+        
+        // Find which columns already exist and which need to be created
+        const existingColumns = {};
+        const columnIndexes = {};
+        
+        for (let i = 3; i < headers.length; i++) {
+            if (headers[i] && selectedDates.includes(headers[i])) {
+                existingColumns[headers[i]] = i;
+                columnIndexes[headers[i]] = i;
+            }
+        }
+        
+        // Find missing dates that need new columns
+        const missingDates = selectedDates.filter(date => !existingColumns[date]);
+        
+        // Add missing date columns to headers
+        if (missingDates.length > 0) {
+            for (const date of missingDates) {
+                headers.push(date);
+                columnIndexes[date] = headers.length - 1;
+            }
+            rows[0] = headers;
+            
+            // Extend each row to have the new columns (fill with empty string)
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                const currentLen = row.length;
+                for (let j = 0; j < missingDates.length; j++) {
+                    row[currentLen + j] = '';
+                }
+                rows[i] = row;
+            }
+        }
+        
+        // Get students from sheet (roll no to row mapping)
+        const studentRowMap = {};
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row || !row[1]) continue;
+            studentRowMap[String(row[1]).trim()] = { rowIndex: i, rowData: row };
+        }
+        
+        // Get locked sessions from database for the selected dates
+        let sessionsQuery = 'SELECT * FROM sessions WHERE locked=true';
+        const params = [];
+        if (section) { params.push(section); sessionsQuery += ` AND section=$${params.length}`; }
+        if (courseCode) { params.push(courseCode); sessionsQuery += ` AND course_code=$${params.length}`; }
+        sessionsQuery += ' ORDER BY started_at ASC';
+        
+        const sessionsRes = await pool.query(sessionsQuery, params);
+        const sessions = sessionsRes.rows;
+        
+        // Map dates to sessions
+        const sessionDateMap = {};
+        for (const s of sessions) {
+            const dateStr = new Date(Number(s.started_at)).toLocaleDateString('en-GB');
+            sessionDateMap[dateStr] = s;
+        }
+        
+        // Get attendance records
+        const sessionIds = sessions.map(s => s.session_id);
+        let allRecords = [];
+        if (sessionIds.length > 0) {
+            const recRes = await pool.query(
+                `SELECT * FROM attendance_records WHERE session_id = ANY($1::text[])`,
+                [sessionIds]
+            );
+            allRecords = recRes.rows;
+        }
+        
+        // Build record map
+        const recordMap = {};
+        for (const rec of allRecords) {
+            if (!recordMap[rec.session_id]) recordMap[rec.session_id] = {};
+            recordMap[rec.session_id][rec.roll_no] = rec;
+        }
+        
+        // Update attendance cells (only empty cells)
+        let updates = 0;
+        let columnsCreated = 0;
+        
+        for (const date of selectedDates) {
+            const session = sessionDateMap[date];
+            if (!session) {
+                console.log(`No session found for date: ${date}`);
+                continue;
+            }
+            
+            const colIndex = columnIndexes[date];
+            
+            for (const [rollNo, studentData] of Object.entries(studentRowMap)) {
+                const currentCellValue = studentData.rowData[colIndex];
+                // Only update if cell is empty, null, undefined, or not already P/L/A
+                if (!currentCellValue || currentCellValue === '' || currentCellValue === null || 
+                    currentCellValue === 0 || currentCellValue === '0') {
+                    
+                    const record = recordMap[session.session_id]?.[rollNo];
+                    let status = '';
+                    if (record) {
+                        if (record.status === 'Present') status = 'P';
+                        else if (record.status === 'Late') status = 'L';
+                        else status = 'A';
+                    } else {
+                        status = 'A';
+                    }
+                    
+                    if (status && status !== currentCellValue) {
+                        rows[studentData.rowIndex][colIndex] = status;
+                        updates++;
+                    }
+                }
+            }
+        }
+        
+        // Write back to file
+        const newWs = XLSX.utils.aoa_to_sheet(rows);
+        // Set column widths
+        newWs['!cols'] = [{ wch: 5 }, { wch: 14 }, { wch: 30 }];
+        for (let i = 0; i < headers.length - 3; i++) {
+            newWs['!cols'].push({ wch: 13 });
+        }
+        
+        XLSX.utils.book_append_sheet(wb, newWs, 'Attendance');
+        XLSX.writeFile(wb, filePath);
+        
+        const message = `Updated ${updates} entries. ${missingDates.length > 0 ? `Created ${missingDates.length} new date columns: ${missingDates.join(', ')}.` : ''}`;
+        console.log(`✅ ${message}`);
+        return { success: true, message: message, updates: updates, columnsCreated: missingDates.length };
+    } catch (err) {
+        console.error('Import error:', err);
+        return { success: false, message: err.message };
+    }
+}
+
+// Get available locked sessions with dates for import selection
+app.get('/api/faculty/available-sessions', async (req, res) => {
+    try {
+        const { section, courseCode, facultyId } = req.query;
+        
+        let sessionsQuery = 'SELECT * FROM sessions WHERE locked=true';
+        const params = [];
+        if (section) { params.push(section); sessionsQuery += ` AND section=$${params.length}`; }
+        if (courseCode) { params.push(courseCode); sessionsQuery += ` AND course_code=$${params.length}`; }
+        sessionsQuery += ' ORDER BY started_at ASC';
+        
+        const sessionsRes = await pool.query(sessionsQuery, params);
+        const sessions = sessionsRes.rows;
+        
+        const availableSessions = sessions.map(s => ({
+            sessionId: s.session_id,
+            topic: s.topic,
+            date: new Date(Number(s.started_at)).toLocaleDateString('en-GB'),
+            startedAt: s.started_at,
+            courseCode: s.course_code,
+            section: s.section
+        }));
+        
+        res.json(availableSessions);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+async function rosterForSession(sessionId) {
+    const s = store.sessions[sessionId];
+    if (!s) return [];
+    const scans = store.scans[sessionId] || {};
+    const studentsRes = await pool.query('SELECT * FROM students WHERE section=$1', [s.section]);
+    return studentsRes.rows.map(st => {
+        const scan = scans[st.roll_no];
+        let status = 'Absent';
+        if (scan) {
+            if (scan.opening && scan.closing) status = 'Present';
+            else if (scan.opening) status = 'Opening Recorded';
+            else if (scan.closing) status = 'Late';
+        }
+        const ov = (s.overrides || []).find(o => o.rollNo === st.roll_no);
+        if (ov) status = ov.status;
+        return { rollNo: st.roll_no, name: st.name, status };
+    });
 }
 
 async function restoreActiveSessions() {
@@ -216,47 +489,8 @@ async function restoreActiveSessions() {
     }
 }
 
-async function rosterForSession(sessionId) {
-    const s = store.sessions[sessionId];
-    if (!s) return [];
-    const scans = store.scans[sessionId] || {};
-    const studentsRes = await pool.query('SELECT * FROM students WHERE section=$1', [s.section]);
-    return studentsRes.rows.map(st => {
-        const scan = scans[st.roll_no];
-        let status = 'Absent';
-        if (scan) {
-            if (scan.opening && scan.closing) status = 'Present';
-            else if (scan.opening || scan.closing) status = 'Opening Recorded';
-        }
-        const ov = (s.overrides || []).find(o => o.rollNo === st.roll_no);
-        if (ov) status = ov.status + ' (override)';
-        return { rollNo: st.roll_no, name: st.name, status };
-    });
-}
+// ============ FACULTY ROUTES ============
 
-async function exportToExcel(sessionId) {
-    const sessionRes = await pool.query('SELECT * FROM sessions WHERE session_id=$1', [sessionId]);
-    const session = sessionRes.rows[0];
-    if (!session) return null;
-    const recordsRes = await pool.query('SELECT * FROM attendance_records WHERE session_id=$1 ORDER BY roll_no', [sessionId]);
-    const studentsRes = await pool.query('SELECT * FROM students WHERE section=$1 ORDER BY roll_no', [session.section]);
-    const dateStr = new Date(Number(session.started_at)).toLocaleDateString('en-GB');
-    const data = [['S#', 'Roll No.', 'Student Name', 'Status (' + dateStr + ')']];
-    let sno = 1;
-    for (const st of studentsRes.rows) {
-        const rec = recordsRes.rows.find(r => r.roll_no === st.roll_no);
-        let status = 'A';
-        if (rec) { if (rec.status === 'Present') status = 'P'; else if (rec.status === 'Late') status = 'L'; }
-        data.push([sno++, st.roll_no, st.name, status]);
-    }
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    ws['!cols'] = [{ wch: 5 }, { wch: 14 }, { wch: 30 }, { wch: 20 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
-    return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-}
-
-// ---------- FACULTY ROUTES ----------
 app.post('/api/faculty/login', async (req, res) => {
     try {
         const { id, pass } = req.body;
@@ -281,16 +515,14 @@ app.post('/api/faculty/login', async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
-// PUT /api/faculty/session/:sessionId/topic
+
 app.put('/api/faculty/session/:sessionId/topic', async (req, res) => {
     try {
         const { sessionId } = req.params;
         const { topic } = req.body;
         if (!topic || !topic.trim()) return res.status(400).json({ error: 'Topic cannot be empty' });
-
         const s = store.sessions[sessionId];
         if (!s) return res.status(404).json({ error: 'Session not found' });
-
         s.topic = topic.trim();
         await pool.query('UPDATE sessions SET topic=$1 WHERE session_id=$2', [topic.trim(), sessionId]);
         res.json({ success: true, topic: s.topic });
@@ -299,7 +531,7 @@ app.put('/api/faculty/session/:sessionId/topic', async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
-// POST /api/faculty/override-locked/:sessionId
+
 app.post('/api/faculty/override-locked/:sessionId', async (req, res) => {
     try {
         const { sessionId } = req.params;
@@ -307,20 +539,14 @@ app.post('/api/faculty/override-locked/:sessionId', async (req, res) => {
         const validStatuses = ['Present', 'Late', 'Absent'];
         if (!rollNo || !status) return res.status(400).json({ error: 'Roll number and status required' });
         if (!validStatuses.includes(status)) return res.status(400).json({ error: 'Invalid status' });
-
         const s = store.sessions[sessionId];
         if (!s) return res.status(404).json({ error: 'Session not found' });
-
-        // Allow override only if session is locked (or you can also allow during active session)
         if (!s.locked) {
-            // Fallback to normal override (already exists)
             s.overrides = (s.overrides || []).filter(o => o.rollNo !== rollNo);
             s.overrides.push({ rollNo, status, at: Date.now() });
             await pool.query('UPDATE sessions SET overrides=$1 WHERE session_id=$2', [JSON.stringify(s.overrides), sessionId]);
             return res.json({ success: true, message: 'Override saved (active session)' });
         }
-
-        // For locked sessions, update attendance_records directly
         await pool.query(
             `UPDATE attendance_records SET status=$1 WHERE session_id=$2 AND roll_no=$3`,
             [status, sessionId, rollNo]
@@ -473,10 +699,26 @@ app.get('/api/faculty/session/:sessionId', async (req, res) => {
         res.json({
             session: s, token: td?.token, expiresAt: td?.expiresAt, serverTime: Date.now(),
             qrCode, roster,
-            presentCount: roster.filter(r => r.status === 'Present' || r.status.startsWith('Present')).length,
+            presentCount: roster.filter(r => r.status === 'Present').length,
             lateCount: roster.filter(r => r.status === 'Late').length,
             absentCount: roster.filter(r => r.status === 'Absent').length,
         });
+    } catch (err) {
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.get('/api/faculty/token/:sessionId', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const td = store.currentToken[sessionId];
+        if (!td) return res.status(404).json({ error: 'No active token' });
+        const s = store.sessions[sessionId];
+        if (s && (s.status === 'opening_locked' || s.locked)) {
+            return res.json({ token: td.token, qrCode: null, expiresAt: td.expiresAt });
+        }
+        const qrImg = await QRCode.toDataURL(`${sessionId}|${td.token}`, { width: 300, margin: 2 });
+        res.json({ token: td.token, qrCode: qrImg, expiresAt: td.expiresAt });
     } catch (err) {
         res.status(500).json({ error: 'Server error' });
     }
@@ -546,33 +788,306 @@ app.get('/api/faculty/export/:sessionId', async (req, res) => {
     }
 });
 
-// ---------- STUDENT ROUTES ----------
-app.post('/api/student/login', async (req, res) => {
+async function exportToExcel(sessionId) {
+    const sessionRes = await pool.query('SELECT * FROM sessions WHERE session_id=$1', [sessionId]);
+    const session = sessionRes.rows[0];
+    if (!session) return null;
+    const recordsRes = await pool.query('SELECT * FROM attendance_records WHERE session_id=$1 ORDER BY roll_no', [sessionId]);
+    const studentsRes = await pool.query('SELECT * FROM students WHERE section=$1 ORDER BY roll_no', [session.section]);
+    const dateStr = new Date(Number(session.started_at)).toLocaleDateString('en-GB');
+    const data = [['S#', 'Roll No.', 'Student Name', dateStr]];
+    let sno = 1;
+    for (const st of studentsRes.rows) {
+        const rec = recordsRes.rows.find(r => r.roll_no === st.roll_no);
+        let status = 'A';
+        if (rec) { if (rec.status === 'Present') status = 'P'; else if (rec.status === 'Late') status = 'L'; }
+        data.push([sno++, st.roll_no, st.name, status]);
+    }
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [{ wch: 5 }, { wch: 14 }, { wch: 30 }, { wch: 20 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
+    return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+}
+
+// ============ IMPORT/EXPORT ENDPOINTS ============
+
+// Get available sessions for import (with dates)
+app.get('/api/faculty/available-sessions', async (req, res) => {
     try {
-        const { rollNo, pass } = req.body;
-        if (!rollNo || !pass) return res.status(400).json({ error: 'Roll number and password required' });
-        const student = (await pool.query('SELECT * FROM students WHERE roll_no=$1 AND pass=$2',
-            [rollNo.trim().toUpperCase(), pass])).rows[0];
-        if (!student) return res.status(401).json({ error: 'Incorrect roll number or password' });
-        res.json({ rollNo: student.roll_no, name: student.name, section: student.section });
+        const { section, courseCode, facultyId } = req.query;
+        
+        let sessionsQuery = 'SELECT * FROM sessions WHERE locked=true';
+        const params = [];
+        if (section) { params.push(section); sessionsQuery += ` AND section=$${params.length}`; }
+        if (courseCode) { params.push(courseCode); sessionsQuery += ` AND course_code=$${params.length}`; }
+        sessionsQuery += ' ORDER BY started_at ASC';
+        
+        const sessionsRes = await pool.query(sessionsQuery, params);
+        const sessions = sessionsRes.rows;
+        
+        const availableSessions = sessions.map(s => ({
+            sessionId: s.session_id,
+            topic: s.topic,
+            date: new Date(Number(s.started_at)).toLocaleDateString('en-GB'),
+            startedAt: s.started_at,
+            courseCode: s.course_code,
+            section: s.section
+        }));
+        
+        res.json(availableSessions);
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: 'Server error' });
     }
 });
 
-app.get('/api/sessions', (req, res) => {
-    const active = Object.values(store.sessions).filter(s => !s.locked);
-    res.json(active);
-});
-app.get('/api/sections', async (req, res) => {
+// Add this helper function BEFORE the import endpoint
+async function processAttendanceExcel(filePath, section, courseCode, selectedDates) {
+    if (!fs.existsSync(filePath)) {
+        throw new Error('File not found');
+    }
+    
     try {
-        const r = await pool.query('SELECT DISTINCT section FROM students ORDER BY section');
-        res.json(r.rows.map(row => row.section));
+        // Read the workbook
+        const wb = XLSX.readFile(filePath);
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        let rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+        
+        if (!rows || rows.length < 2) {
+            throw new Error('Empty sheet');
+        }
+        
+        let headers = [...rows[0]];
+        
+        // Find which columns already exist and which need to be created
+        const columnIndexes = {};
+        
+        for (let i = 3; i < headers.length; i++) {
+            if (headers[i] && selectedDates.includes(headers[i])) {
+                columnIndexes[headers[i]] = i;
+            }
+        }
+        
+        // Find missing dates that need new columns
+        const missingDates = selectedDates.filter(date => !columnIndexes[date]);
+        
+        // Add missing date columns to headers
+        if (missingDates.length > 0) {
+            for (const date of missingDates) {
+                headers.push(date);
+                columnIndexes[date] = headers.length - 1;
+            }
+            rows[0] = headers;
+            
+            // Extend each row to have the new columns (fill with empty string)
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row) continue;
+                const currentLen = row.length;
+                for (let j = 0; j < missingDates.length; j++) {
+                    row[currentLen + j] = '';
+                }
+                rows[i] = row;
+            }
+        }
+        
+        // Get students from sheet (roll no to row mapping)
+        const studentRowMap = {};
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row || !row[1]) continue;
+            studentRowMap[String(row[1]).trim()] = { rowIndex: i, rowData: row };
+        }
+        
+        // Get locked sessions from database for the selected dates
+        let sessionsQuery = 'SELECT * FROM sessions WHERE locked=true';
+        const params = [];
+        if (section) { params.push(section); sessionsQuery += ` AND section=$${params.length}`; }
+        if (courseCode) { params.push(courseCode); sessionsQuery += ` AND course_code=$${params.length}`; }
+        sessionsQuery += ' ORDER BY started_at ASC';
+        
+        const sessionsRes = await pool.query(sessionsQuery, params);
+        const sessions = sessionsRes.rows;
+        
+        // Map dates to sessions (remove duplicates - keep first session per date)
+        const sessionDateMap = {};
+        for (const s of sessions) {
+            const dateStr = new Date(Number(s.started_at)).toLocaleDateString('en-GB');
+            if (!sessionDateMap[dateStr]) {
+                sessionDateMap[dateStr] = s;
+            }
+        }
+        
+        // Get attendance records
+        const sessionIds = sessions.map(s => s.session_id);
+        let allRecords = [];
+        if (sessionIds.length > 0) {
+            const recRes = await pool.query(
+                `SELECT * FROM attendance_records WHERE session_id = ANY($1::text[])`,
+                [sessionIds]
+            );
+            allRecords = recRes.rows;
+        }
+        
+        // Build record map
+        const recordMap = {};
+        for (const rec of allRecords) {
+            if (!recordMap[rec.session_id]) recordMap[rec.session_id] = {};
+            recordMap[rec.session_id][rec.roll_no] = rec;
+        }
+        
+        // Update attendance cells (only empty cells)
+        let updates = 0;
+        
+        for (const date of selectedDates) {
+            const session = sessionDateMap[date];
+            if (!session) {
+                console.log(`No session found for date: ${date}`);
+                continue;
+            }
+            
+            const colIndex = columnIndexes[date];
+            
+            for (const [rollNo, studentData] of Object.entries(studentRowMap)) {
+                const currentCellValue = studentData.rowData[colIndex];
+                // Only update if cell is empty, null, undefined, or not already P/L/A
+                if (!currentCellValue || currentCellValue === '' || currentCellValue === null || 
+                    currentCellValue === 0 || currentCellValue === '0') {
+                    
+                    const record = recordMap[session.session_id]?.[rollNo];
+                    let status = 'A';
+                    if (record) {
+                        if (record.status === 'Present') status = 'P';
+                        else if (record.status === 'Late') status = 'L';
+                    }
+                    
+                    if (status && status !== currentCellValue) {
+                        rows[studentData.rowIndex][colIndex] = status;
+                        updates++;
+                    }
+                }
+            }
+        }
+        
+        // Create new workbook
+        const newWs = XLSX.utils.aoa_to_sheet(rows);
+        // Set column widths
+        newWs['!cols'] = [{ wch: 5 }, { wch: 14 }, { wch: 30 }];
+        for (let i = 0; i < headers.length - 3; i++) {
+            newWs['!cols'].push({ wch: 13 });
+        }
+        
+        const newWb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(newWb, newWs, 'Attendance');
+        
+        // Save to temporary output file
+        const outputPath = path.join(__dirname, 'uploads', `output_${Date.now()}.xlsx`);
+        XLSX.writeFile(newWb, outputPath);
+        
+        console.log(`✅ Updated ${updates} entries. Created ${missingDates.length} new date columns`);
+        return outputPath;
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error.' });
+        console.error('Process error:', err);
+        throw err;
+    }
+}
+
+// Replace the import endpoint with this version
+app.post('/api/faculty/import-attendance', upload.single('file'), async (req, res) => {
+    let tempFilePath = null;
+    let outputFilePath = null;
+    try {
+        console.log('Import request received');
+        const { section, courseCode, selectedDates } = req.body;
+        
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+        
+        tempFilePath = req.file.path;
+        
+        if (!section) {
+            return res.status(400).json({ error: 'Section is required' });
+        }
+        
+        let datesToUpdate = [];
+        if (selectedDates) {
+            try {
+                datesToUpdate = JSON.parse(selectedDates);
+            } catch(e) {
+                datesToUpdate = [];
+            }
+        }
+        
+        if (datesToUpdate.length === 0) {
+            return res.status(400).json({ error: 'Please select at least one date column to update' });
+        }
+        
+        console.log(`Processing file: ${tempFilePath}, section: ${section}, dates: ${datesToUpdate.join(', ')}`);
+        
+        // Process the file and save to a new output file
+        outputFilePath = await processAttendanceExcel(tempFilePath, section, courseCode, datesToUpdate);
+        
+        if (outputFilePath && fs.existsSync(outputFilePath)) {
+            const originalFileName = req.file.originalname || 'attendance_sheet.xlsx';
+            const outputFileName = `Updated_${originalFileName}`;
+            
+            // Send the file
+            res.download(outputFilePath, outputFileName, (err) => {
+                if (err) {
+                    console.error('Download error:', err);
+                }
+                // Clean up temp files after download
+                setTimeout(() => {
+                    try {
+                        if (tempFilePath && fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+                        if (outputFilePath && fs.existsSync(outputFilePath)) fs.unlinkSync(outputFilePath);
+                    } catch(e) { console.log('Cleanup error:', e); }
+                }, 1000);
+            });
+        } else {
+            throw new Error('Failed to process file');
+        }
+    } catch (err) {
+        console.error('Import error:', err);
+        // Clean up temp file
+        if (tempFilePath && fs.existsSync(tempFilePath)) {
+            try { fs.unlinkSync(tempFilePath); } catch(e) {}
+        }
+        if (outputFilePath && fs.existsSync(outputFilePath)) {
+            try { fs.unlinkSync(outputFilePath); } catch(e) {}
+        }
+        res.status(500).json({ error: err.message });
     }
 });
+
+
+// Export attendance sheet (download)
+app.get('/api/faculty/export-attendance-sheet', async (req, res) => {
+    try {
+        const { section, courseCode, facultyId } = req.query;
+        
+        if (!facultyId) {
+            return res.status(400).json({ error: 'Faculty ID required' });
+        }
+        
+        const fac = (await pool.query('SELECT * FROM faculty WHERE id=$1', [facultyId])).rows[0];
+        if (!fac) {
+            return res.status(404).json({ error: 'Faculty not found' });
+        }
+        
+        const result = await exportAttendanceToExcel(section, courseCode);
+        
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+        res.send(result.buffer);
+    } catch (err) {
+        console.error('Export error:', err);
+        res.status(500).json({ error: 'Export failed: ' + err.message });
+    }
+});
+
 app.get('/api/faculty/export-cumulative', async (req, res) => {
     try {
         const { section, courseCode, facultyId } = req.query;
@@ -580,7 +1095,6 @@ app.get('/api/faculty/export-cumulative', async (req, res) => {
         const fac = (await pool.query('SELECT * FROM faculty WHERE id=$1', [facultyId])).rows[0];
         if (!fac) return res.status(404).json({ error: 'Faculty not found' });
 
-        // Fetch all locked sessions for this section/course
         let sessionsQuery = 'SELECT * FROM sessions WHERE locked=true';
         const params = [];
         if (section) { params.push(section); sessionsQuery += ` AND section=$${params.length}`; }
@@ -589,7 +1103,6 @@ app.get('/api/faculty/export-cumulative', async (req, res) => {
         const sessionsRes = await pool.query(sessionsQuery, params);
         const sessions = sessionsRes.rows;
 
-        // Fetch students (optionally filtered by section)
         let studentsRes;
         if (section) {
             studentsRes = await pool.query('SELECT * FROM students WHERE section=$1 ORDER BY roll_no', [section]);
@@ -597,7 +1110,6 @@ app.get('/api/faculty/export-cumulative', async (req, res) => {
             studentsRes = await pool.query('SELECT * FROM students ORDER BY roll_no');
         }
 
-        // Fetch attendance records for these sessions
         const sessionIds = sessions.map(s => s.session_id);
         let allRecords = [];
         if (sessionIds.length > 0) {
@@ -608,7 +1120,6 @@ app.get('/api/faculty/export-cumulative', async (req, res) => {
             allRecords = recRes.rows;
         }
 
-        // Build header: S#, Roll No., Student Name, then dates
         const dateCols = sessions.map(s => {
             const d = new Date(Number(s.started_at));
             return d.toLocaleDateString('en-GB');
@@ -650,6 +1161,37 @@ app.get('/api/faculty/export-cumulative', async (req, res) => {
         res.status(500).json({ error: 'Server error.' });
     }
 });
+
+app.get('/api/sections', async (req, res) => {
+    try {
+        const r = await pool.query('SELECT DISTINCT section FROM students ORDER BY section');
+        res.json(r.rows.map(row => row.section));
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error.' });
+    }
+});
+
+// ============ STUDENT ROUTES ============
+
+app.post('/api/student/login', async (req, res) => {
+    try {
+        const { rollNo, pass } = req.body;
+        if (!rollNo || !pass) return res.status(400).json({ error: 'Roll number and password required' });
+        const student = (await pool.query('SELECT * FROM students WHERE roll_no=$1 AND pass=$2',
+            [rollNo.trim().toUpperCase(), pass])).rows[0];
+        if (!student) return res.status(401).json({ error: 'Incorrect roll number or password' });
+        res.json({ rollNo: student.roll_no, name: student.name, section: student.section });
+    } catch (err) {
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.get('/api/sessions', (req, res) => {
+    const active = Object.values(store.sessions).filter(s => !s.locked);
+    res.json(active);
+});
+
 app.post('/api/student/scan', async (req, res) => {
     try {
         const { rollNo, sessionId, token } = req.body;
@@ -723,7 +1265,7 @@ app.get('/api/student/:rollNo/attendance', async (req, res) => {
     }
 });
 
-// ---------- STATIC FILES & CODE VIEWER ----------
+// ============ STATIC FILES & CODE VIEWER ============
 app.get('/code-file/:name', (req, res) => {
     const allowed = ['server.js', 'faculty.html', 'student.html'];
     if (!allowed.includes(req.params.name)) return res.status(404).send('Not allowed');
@@ -744,7 +1286,7 @@ app.get('/code', (req, res) => {
     res.send(`<!DOCTYPE html><html><head><title>Code Viewer</title></head><body><h1>FLEX Source Code</h1><a href="/code-file/server.js">server.js</a><br><a href="/code-file/faculty.html">faculty.html</a><br><a href="/code-file/student.html">student.html</a></body></html>`);
 });
 
-// ---------- START SERVER ----------
+// ============ START SERVER ============
 async function startServer() {
     await initDatabase();
     await restoreActiveSessions();

@@ -1627,6 +1627,11 @@
                 const sections = [...new Set(sessions.map(s => s.section))];
 
                 c.innerHTML = `
+                    <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:flex-end">
+                        <button class="btn btn-outline btn-sm" onclick="renderHistoryPage(document.getElementById('pageContent'))">↻ Refresh</button>
+                        <button class="btn btn-primary btn-sm" onclick="showImportModal()">📥 Import Excel</button>
+                        <button class="btn btn-success btn-sm" onclick="exportAttendanceSheet()">📤 Export Full Sheet</button>
+                    </div>
                 <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:flex-end">
                     <div style="flex:1;min-width:140px">
                         <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">Course</label>
@@ -1714,6 +1719,193 @@
             </div>`;
             }).join('');
         }
-    </script>
+async function uploadAttendanceSheet() {
+    const fileInput = document.getElementById('importFile');
+    const section = document.getElementById('importSection').value;
+    
+    // Get selected dates
+    const checkboxes = document.querySelectorAll('.date-checkbox:checked');
+    const selectedDates = Array.from(checkboxes).map(cb => cb.value);
+    
+    if (!fileInput.files || !fileInput.files[0]) {
+        toast('Please select a file', 'err');
+        return;
+    }
+    
+    if (selectedDates.length === 0) {
+        toast('Please select at least one date column to update', 'err');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    formData.append('section', section);
+    formData.append('selectedDates', JSON.stringify(selectedDates));
+    
+    toast('Uploading and processing...');
+    
+    try {
+        const response = await fetch('/api/faculty/import-attendance', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            // Check content type
+            const contentType = response.headers.get('content-type');
+            
+            if (contentType && contentType.includes('application/json')) {
+                const data = await response.json();
+                if (data.error) {
+                    toast(`❌ ${data.error}`, 'err');
+                } else {
+                    toast(`✅ ${data.message || 'File processed'}`);
+                    closeImportModal();
+                }
+            } else {
+                // It's a file download
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Updated_${fileInput.files[0].name}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                toast('✅ File processed and downloaded!');
+                closeImportModal();
+            }
+        } else {
+            const data = await response.json();
+            toast(`❌ ${data.error || 'Upload failed'}`, 'err');
+        }
+    } catch (err) {
+        console.error('Upload error:', err);
+        toast('Upload failed: ' + err.message, 'err');
+    }
+}
+// Also update the closeImportModal function
+function closeImportModal() {
+    const modal = document.getElementById('importModal');
+    if (modal) modal.remove();
+}
+
+// Update showImportModal function
+async function showImportModal() {
+    if (!faculty) {
+        toast('Please login first', 'err');
+        return;
+    }
+    
+    const modalHtml = `
+        <div id="importModal" class="overlay show" style="display:flex">
+            <div class="modal" style="max-width:550px; width:90%">
+                <h3>📥 Import Attendance Sheet</h3>
+                <div class="fgroup">
+                    <label>Select Excel File (.xlsx)</label>
+                    <input type="file" id="importFile" accept=".xlsx">
+                </div>
+                <div class="fgroup">
+                    <label>Section</label>
+                    <select id="importSection" onchange="loadAvailableDatesForImport()">
+                        <option value="BSE-243A">BSE-243A</option>
+                        <option value="BSE-243B">BSE-243B</option>
+                    </select>
+                </div>
+                <div class="fgroup">
+                    <label>Select Date Columns to Update (check all that apply)</label>
+                    <div id="dateCheckboxes" style="max-height:250px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; padding:12px; background:#f9fafb">
+                        Loading available sessions...
+                    </div>
+                    <small style="color:var(--muted); display:block; margin-top:8px">
+                        ℹ️ Only empty cells will be updated. Existing data (like marks) will not be overwritten.
+                    </small>
+                </div>
+                <div class="modal-actions" style="margin-top:20px">
+                    <button class="btn btn-outline" onclick="closeImportModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="uploadAttendanceSheet()">Upload & Update</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    await loadAvailableDatesForImport();
+}
+
+async function loadAvailableDatesForImport() {
+    const section = document.getElementById('importSection')?.value || 'BSE-243A';
+    const container = document.getElementById('dateCheckboxes');
+    if (!container) return;
+    
+    container.innerHTML = '<div style="padding:10px;text-align:center">Loading sessions...</div>';
+    
+    try {
+        const response = await fetch(`/api/faculty/available-sessions?facultyId=${faculty.id}&section=${section}`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const sessions = await response.json();
+        
+        if (!sessions || sessions.length === 0) {
+            container.innerHTML = '<div style="padding:10px;text-align:center;color:var(--red)">❌ No locked sessions found. Complete an attendance session first (Opening → Closing → Lock).</div>';
+            return;
+        }
+        
+        // Remove duplicate dates (in case multiple sessions on same day)
+        const uniqueSessions = [];
+        const seenDates = new Set();
+        for (const s of sessions) {
+            if (!seenDates.has(s.date)) {
+                seenDates.add(s.date);
+                uniqueSessions.push(s);
+            }
+        }
+        
+        container.innerHTML = uniqueSessions.map(s => `
+            <label style="display:flex; align-items:center; gap:10px; margin-bottom:10px; padding:8px; background:white; border-radius:6px; cursor:pointer">
+                <input type="checkbox" value="${s.date}" class="date-checkbox" style="width:18px; height:18px">
+                <div>
+                    <strong style="color:var(--accent)">${s.date}</strong><br>
+                    <span style="font-size:12px; color:var(--muted)">${s.topic} (${s.courseCode})</span>
+                </div>
+            </label>
+        `).join('');
+        
+        // Add "Select All" option
+        const selectAllHtml = `
+            <label style="display:flex; align-items:center; gap:10px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); cursor:pointer">
+                <input type="checkbox" id="selectAllDates" style="width:18px; height:18px">
+                <strong>✅ Select All Dates</strong>
+            </label>
+        `;
+        container.insertAdjacentHTML('beforeend', selectAllHtml);
+        
+        const selectAllCheckbox = document.getElementById('selectAllDates');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', (e) => {
+                document.querySelectorAll('.date-checkbox').forEach(cb => cb.checked = e.target.checked);
+            });
+        }
+        
+    } catch (err) {
+        console.error('Error loading sessions:', err);
+        container.innerHTML = `<div style="padding:10px;text-align:center;color:var(--red)">❌ Error loading sessions: ${err.message}<br>Make sure you have locked at least one session.</div>`;
+    }
+}
+async function exportAttendanceSheet() {
+    const course = document.getElementById('hCourse')?.value || '';
+    const section = document.getElementById('hSection')?.value || '';
+    const params = new URLSearchParams({ facultyId: faculty.id });
+    if (course) params.append('courseCode', course);
+    if (section) params.append('section', section);
+    window.open(`/api/faculty/export-attendance-sheet?${params.toString()}`, '_blank');
+    toast('📥 Downloading attendance sheet...');
+}
+
+ </script>
 </body>
 </html>
