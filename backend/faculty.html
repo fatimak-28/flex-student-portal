@@ -953,6 +953,22 @@
             clearTimeout(t._t);
             t._t = setTimeout(() => t.classList.remove('show'), 3200);
         }
+        async function validateActiveSession(session) {
+            if (!session || !session.sessionId) return null;
+            try {
+                const r = await fetch(`/api/faculty/session/${session.sessionId}`);
+                if (!r.ok) return null;
+                const data = await r.json();
+                // If the session exists and is not locked, return the full session object
+                if (data.session && !data.session.locked) {
+                    return data.session;
+                }
+                return null;
+            } catch (err) {
+                console.error('Session validation error:', err);
+                return null;
+            }
+        }
 
         // ── LOGIN / LOGOUT ────────────────────────────────────────────────────────────
         async function doLogin() {
@@ -981,9 +997,17 @@
                 document.getElementById('sidebarRole').textContent = (faculty.dept || '') + ' Dept.';
                 document.getElementById('topbarUser').textContent = faculty.name;
 
-                // Restore active session if any
+                // Restore active session if any – validate it first
                 if (faculty.activeSession) {
-                    currentSession = faculty.activeSession;
+                    const validSession = await validateActiveSession(faculty.activeSession);
+                    if (validSession) {
+                        currentSession = validSession;
+                    } else {
+                        currentSession = null;
+                        // Optionally notify backend to clear stale reference (not required)
+                    }
+                } else {
+                    currentSession = null;
                 }
 
                 showPage('attendance');
@@ -1024,17 +1048,69 @@
             else c.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;color:var(--muted)"><div style="font-size:52px;opacity:.3">🔧</div><div style="font-size:18px;font-weight:600;color:var(--text)">Coming Soon</div></div>`;
         }
 
-        // ── ATTENDANCE PAGE ───────────────────────────────────────────────────────────
         function renderAttendancePage(c) {
             stopPolling();
+
+            // If there is a valid currentSession, show live session view
             if (currentSession && !currentSession.locked) {
                 renderLiveSession(c);
+                return;
+            }
+
+            // Otherwise, show the start session page, but with a resume button if an active session exists (e.g., from login)
+            renderStartSession(c);
+
+            // If there is an active session but not yet loaded (stale), show a prominent resume button
+            // This can happen if faculty.activeSession exists but validation failed earlier.
+            // We'll check again quietly.
+            if (faculty && faculty.activeSession && !currentSession) {
+                // Add a resume banner at the top of the start page
+                const startCard = c.querySelector('.card:first-child');
+                if (startCard && !document.getElementById('resumeBanner')) {
+                    const banner = document.createElement('div');
+                    banner.id = 'resumeBanner';
+                    banner.className = 'resume-banner';
+                    banner.innerHTML = `
+                <div class="resume-info">
+                    <h4>⏩ You have an existing active session</h4>
+                    <p>${faculty.activeSession.topic || 'Session'} – ${faculty.activeSession.courseCode} · ${faculty.activeSession.section}</p>
+                </div>
+                <button class="btn btn-primary" onclick="resumeExistingSession()">Resume Session</button>
+            `;
+                    startCard.parentNode.insertBefore(banner, startCard);
+                }
+            }
+        }
+        async function resumeExistingSession() {
+            if (!faculty || !faculty.activeSession) {
+                toast('No active session to resume', 'err');
+                return;
+            }
+            const valid = await validateActiveSession(faculty.activeSession);
+            if (valid) {
+                currentSession = valid;
+                // Also sync token expiry and other data
+                const r = await fetch(`/api/faculty/session/${currentSession.sessionId}`);
+                const data = await r.json();
+                if (data.token) tokenExpiry = data.expiresAt;
+                renderLiveSession(document.getElementById('pageContent'));
+                if (data.qrCode && data.token) updateQR(data.qrCode, data.token);
+                if (currentSession.status === 'opening' || currentSession.status === 'closing') {
+                    startWindowTimer(10 * 60 * 1000, currentSession.status);
+                    startPolling();
+                }
+                toast('Resumed session', 'ok');
             } else {
-                renderStartSession(c);
+                toast('Session no longer exists. Starting fresh.', 'err');
+                currentSession = null;
+                faculty.activeSession = null;
+                renderStartSession(document.getElementById('pageContent'));
             }
         }
 
         function renderStartSession(c) {
+            const oldBanner = document.getElementById('resumeBanner');
+            if (oldBanner) oldBanner.remove();
             const courses = (faculty?.courses || ['SE-2001']).map(cv => `<option value="${cv}">${cv}</option>`).join('');
             const today = new Date().toISOString().split('T')[0];
             c.innerHTML = `
@@ -1349,6 +1425,7 @@
 
         function finishSession() {
             currentSession = null;
+            if (faculty) faculty.activeSession = null;
             stopPolling(); stopWindowTimer();
             renderStartSession(document.getElementById('pageContent'));
             toast('✓ Session complete');
