@@ -1336,6 +1336,16 @@
             if (!currentSession) { toast('No session selected', 'err'); return; }
             window.open(`/api/faculty/export/${currentSession.sessionId}`, '_blank');
         }
+        async function exportCumulativeSheet() {
+            const course = document.getElementById('hCourse')?.value || '';
+            const section = document.getElementById('hSection')?.value || '';
+            const params = new URLSearchParams({ facultyId: faculty.id });
+            if (course) params.append('courseCode', course);
+            if (section) params.append('section', section);
+            window.open(`/api/faculty/export-cumulative?${params.toString()}`, '_blank');
+            toast('📥 Downloading cumulative attendance sheet…');
+        }
+
 
         function finishSession() {
             currentSession = null;
@@ -1556,6 +1566,7 @@
                         </select>
                     </div>
                     <button class="btn btn-outline btn-sm" onclick="renderHistoryPage(document.getElementById('pageContent'))">↻ Refresh</button>
+<button class="btn btn-success btn-sm" onclick="exportCumulativeSheet()" title="Download full attendance sheet with all sessions as date columns">📥 Full Sheet</button>
                 </div>
                 <div id="histCards"></div>`;
 

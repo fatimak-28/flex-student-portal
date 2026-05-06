@@ -564,7 +564,92 @@ app.get('/api/sessions', (req, res) => {
     const active = Object.values(store.sessions).filter(s => !s.locked);
     res.json(active);
 });
+app.get('/api/sections', async (req, res) => {
+    try {
+        const r = await pool.query('SELECT DISTINCT section FROM students ORDER BY section');
+        res.json(r.rows.map(row => row.section));
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error.' });
+    }
+});
+app.get('/api/faculty/export-cumulative', async (req, res) => {
+    try {
+        const { section, courseCode, facultyId } = req.query;
+        if (!facultyId) return res.status(400).json({ error: 'Faculty ID is required' });
+        const fac = (await pool.query('SELECT * FROM faculty WHERE id=$1', [facultyId])).rows[0];
+        if (!fac) return res.status(404).json({ error: 'Faculty not found' });
 
+        // Fetch all locked sessions for this section/course
+        let sessionsQuery = 'SELECT * FROM sessions WHERE locked=true';
+        const params = [];
+        if (section) { params.push(section); sessionsQuery += ` AND section=$${params.length}`; }
+        if (courseCode) { params.push(courseCode); sessionsQuery += ` AND course_code=$${params.length}`; }
+        sessionsQuery += ' ORDER BY started_at ASC';
+        const sessionsRes = await pool.query(sessionsQuery, params);
+        const sessions = sessionsRes.rows;
+
+        // Fetch students (optionally filtered by section)
+        let studentsRes;
+        if (section) {
+            studentsRes = await pool.query('SELECT * FROM students WHERE section=$1 ORDER BY roll_no', [section]);
+        } else {
+            studentsRes = await pool.query('SELECT * FROM students ORDER BY roll_no');
+        }
+
+        // Fetch attendance records for these sessions
+        const sessionIds = sessions.map(s => s.session_id);
+        let allRecords = [];
+        if (sessionIds.length > 0) {
+            const recRes = await pool.query(
+                `SELECT * FROM attendance_records WHERE session_id = ANY($1::text[])`,
+                [sessionIds]
+            );
+            allRecords = recRes.rows;
+        }
+
+        // Build header: S#, Roll No., Student Name, then dates
+        const dateCols = sessions.map(s => {
+            const d = new Date(Number(s.started_at));
+            return d.toLocaleDateString('en-GB');
+        });
+        const header = ['S#', 'Roll No.', 'Student Name', ...dateCols];
+        const dataRows = [header];
+        let sno = 1;
+        for (const st of studentsRes.rows) {
+            const row = [sno++, st.roll_no, st.name];
+            for (const s of sessions) {
+                const rec = allRecords.find(r => r.session_id === s.session_id && r.roll_no === st.roll_no);
+                if (!rec) { row.push('A'); continue; }
+                if (rec.status === 'Present') row.push('P');
+                else if (rec.status === 'Late') row.push('L');
+                else row.push('A');
+            }
+            dataRows.push(row);
+        }
+
+        const ws = XLSX.utils.aoa_to_sheet(dataRows);
+        const colWidths = [{ wch: 5 }, { wch: 14 }, { wch: 30 }];
+        for (let i = 0; i < sessions.length; i++) colWidths.push({ wch: 13 });
+        ws['!cols'] = colWidths;
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
+        const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+        const sectionLabel = section ? section.replace(/[^a-zA-Z0-9]/g, '-') : 'All';
+        const courseLabel = courseCode ? courseCode.replace(/[^a-zA-Z0-9]/g, '-') : 'All';
+        const today = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
+        const filename = `AttendanceSheet_${courseLabel}_${sectionLabel}_${today}.xlsx`;
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+    } catch (err) {
+        console.error('Cumulative export error:', err);
+        res.status(500).json({ error: 'Server error.' });
+    }
+});
 app.post('/api/student/scan', async (req, res) => {
     try {
         const { rollNo, sessionId, token } = req.body;
