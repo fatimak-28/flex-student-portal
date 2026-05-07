@@ -177,7 +177,6 @@ async function lockSession(sessionId) {
     console.log(`🔒 Session ${sessionId} locked.`);
 }
 
-// Function to create/update attendance Excel sheet (without overwriting existing data)
 async function exportAttendanceToExcel(section, courseCode) {
     // Get locked sessions
     let sessionsQuery = 'SELECT * FROM sessions WHERE locked=true';
@@ -621,6 +620,7 @@ app.post('/api/faculty/lock-opening/:sessionId', async (req, res) => {
     }
 });
 
+// Resume opening window (opening_locked → opening)
 app.post('/api/faculty/resume-opening/:sessionId', async (req, res) => {
     try {
         const { sessionId } = req.params;
@@ -628,9 +628,36 @@ app.post('/api/faculty/resume-opening/:sessionId', async (req, res) => {
         if (!s) return res.status(404).json({ error: 'Session not found' });
         if (s.locked) return res.status(400).json({ error: 'Locked cannot resume' });
         if (s.status !== 'opening_locked') return res.status(400).json({ error: 'Not in opening_locked' });
+        
         s.status = 'opening';
         await pool.query('UPDATE sessions SET status=$1 WHERE session_id=$2', ['opening', sessionId]);
-        startTokenRotation(sessionId);
+        
+        // Generate a FRESH token immediately
+        if (store.rotateIntervals[sessionId]) {
+            clearInterval(store.rotateIntervals[sessionId]);
+        }
+        
+        const freshToken = token8();
+        const now = Date.now();
+        store.currentToken[sessionId] = { token: freshToken, generatedAt: now, expiresAt: now + 30000 };
+        await pool.query('UPDATE current_tokens SET token=$1, generated_at=$2, expires_at=$3 WHERE session_id=$4',
+            [freshToken, now, now + 30000, sessionId]);
+        
+        // Start fresh token rotation
+        store.rotateIntervals[sessionId] = setInterval(async () => {
+            const s2 = store.sessions[sessionId];
+            if (s2 && !s2.locked && s2.status === 'opening') {
+                const nt = token8();
+                const now2 = Date.now();
+                store.currentToken[sessionId] = { token: nt, generatedAt: now2, expiresAt: now2 + 30000 };
+                await pool.query(`UPDATE current_tokens SET token=$1, generated_at=$2, expires_at=$3 WHERE session_id=$4`,
+                    [nt, now2, now2 + 30000, sessionId]);
+            } else {
+                clearInterval(store.rotateIntervals[sessionId]);
+            }
+        }, 30000);
+        
+        // Auto-lock opening again after 10 min
         store.openingTimers[sessionId] = setTimeout(async () => {
             const s2 = store.sessions[sessionId];
             if (s2 && !s2.locked && s2.status === 'opening') {
@@ -639,14 +666,17 @@ app.post('/api/faculty/resume-opening/:sessionId', async (req, res) => {
                 await pool.query('UPDATE sessions SET status=$1 WHERE session_id=$2', ['opening_locked', sessionId]);
             }
         }, 10 * 60 * 1000);
+        
         const td = store.currentToken[sessionId];
         const qrImg = await QRCode.toDataURL(`${sessionId}|${td.token}`, { width: 300, margin: 2 });
-        res.json({ success: true, token: td.token, qrCode: qrImg, expiresAt: td.expiresAt });
+        res.json({ success: true, status: 'opening', token: td.token, qrCode: qrImg, expiresAt: td.expiresAt });
     } catch (err) {
-        res.status(500).json({ error: 'Server error' });
+        console.error('Resume opening error:', err);
+        res.status(500).json({ error: err.message });
     }
 });
 
+// Start closing window
 app.post('/api/faculty/start-closing/:sessionId', async (req, res) => {
     try {
         const { sessionId } = req.params;
@@ -654,23 +684,54 @@ app.post('/api/faculty/start-closing/:sessionId', async (req, res) => {
         if (!s) return res.status(404).json({ error: 'Not found' });
         if (s.locked) return res.status(400).json({ error: 'Locked' });
         if (s.status !== 'opening_locked') return res.status(400).json({ error: 'Must close opening first' });
+        
         s.status = 'closing';
         await pool.query('UPDATE sessions SET status=$1 WHERE session_id=$2', ['closing', sessionId]);
-        startTokenRotation(sessionId);
+        
+        // Stop existing token rotation
+        if (store.rotateIntervals[sessionId]) {
+            clearInterval(store.rotateIntervals[sessionId]);
+            delete store.rotateIntervals[sessionId];
+        }
+        
+        // Generate a FRESH token immediately
+        const freshToken = token8();
+        const now = Date.now();
+        store.currentToken[sessionId] = { token: freshToken, generatedAt: now, expiresAt: now + 30000 };
+        await pool.query('UPDATE current_tokens SET token=$1, generated_at=$2, expires_at=$3 WHERE session_id=$4',
+            [freshToken, now, now + 30000, sessionId]);
+        
+        // Start fresh token rotation for closing window
+        store.rotateIntervals[sessionId] = setInterval(async () => {
+            const sess = store.sessions[sessionId];
+            if (!sess || sess.locked || sess.status !== 'closing') { 
+                clearInterval(store.rotateIntervals[sessionId]); 
+                delete store.rotateIntervals[sessionId];
+                return; 
+            }
+            const nt = token8();
+            const now2 = Date.now();
+            store.currentToken[sessionId] = { token: nt, generatedAt: now2, expiresAt: now2 + 30000 };
+            await pool.query(`UPDATE current_tokens SET token=$1, generated_at=$2, expires_at=$3 WHERE session_id=$4`,
+                [nt, now2, now2 + 30000, sessionId]);
+        }, 30000);
+        
+        // Auto-lock closing after 10 min
         store.closingTimers[sessionId] = setTimeout(async () => {
             const s2 = store.sessions[sessionId];
             if (s2 && !s2.locked && s2.status === 'closing') {
                 await lockSession(sessionId);
             }
         }, 10 * 60 * 1000);
+        
         const td = store.currentToken[sessionId];
         const qrImg = await QRCode.toDataURL(`${sessionId}|${td.token}`, { width: 300, margin: 2 });
-        res.json({ success: true, token: td.token, qrCode: qrImg, expiresAt: td.expiresAt });
+        res.json({ success: true, status: 'closing', token: td.token, qrCode: qrImg, expiresAt: td.expiresAt });
     } catch (err) {
-        res.status(500).json({ error: 'Server error' });
+        console.error('Start closing error:', err);
+        res.status(500).json({ error: err.message });
     }
 });
-
 app.post('/api/faculty/lock-session/:sessionId', async (req, res) => {
     try {
         const { sessionId } = req.params;
@@ -746,19 +807,35 @@ app.get('/api/faculty/history', async (req, res) => {
     try {
         const { facultyId } = req.query;
         if (!facultyId) return res.status(400).json({ error: 'Faculty ID required' });
+        
         const fac = (await pool.query('SELECT * FROM faculty WHERE id=$1', [facultyId])).rows[0];
         if (!fac) return res.status(404).json({ error: 'Faculty not found' });
+        
         const sessions = (await pool.query(
             `SELECT * FROM sessions WHERE locked=true AND course_code=ANY($1::text[]) ORDER BY started_at DESC`,
             [fac.courses]
         )).rows;
+        
         const locked = [];
         for (const s of sessions) {
-            const records = (await pool.query('SELECT * FROM attendance_records WHERE session_id=$1', [s.session_id])).rows;
+            // IMPORTANT: Order by roll_no to keep consistent order
+            const records = (await pool.query(
+                `SELECT * FROM attendance_records WHERE session_id=$1 ORDER BY roll_no`, 
+                [s.session_id]
+            )).rows;
+            
             locked.push({
-                sessionId: s.session_id, topic: s.topic || 'No topic', courseCode: s.course_code || 'N/A',
-                section: s.section || 'N/A', facultyName: s.faculty_name, startedAt: s.started_at,
-                records: records.map(r => ({ rollNo: r.roll_no, name: r.name, status: r.status })),
+                sessionId: s.session_id, 
+                topic: s.topic || 'No topic', 
+                courseCode: s.course_code || 'N/A',
+                section: s.section || 'N/A', 
+                facultyName: s.faculty_name, 
+                startedAt: s.started_at,
+                records: records.map(r => ({ 
+                    rollNo: r.roll_no, 
+                    name: r.name, 
+                    status: r.status 
+                })),
                 present: records.filter(r => r.status === 'Present').length,
                 late: records.filter(r => r.status === 'Late').length,
                 absent: records.filter(r => r.status === 'Absent').length,
@@ -767,6 +844,7 @@ app.get('/api/faculty/history', async (req, res) => {
         }
         res.json(locked);
     } catch (err) {
+        console.error('History error:', err);
         res.status(500).json({ error: 'Server error' });
     }
 });
@@ -1297,5 +1375,132 @@ async function startServer() {
         console.log(`   Student → http://localhost:${PORT}/student.html\n`);
     });
 }
+// Delete entire session and its attendance records
+app.delete('/api/faculty/session/:sessionId', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        
+        console.log(`Deleting session: ${sessionId}`);
+        
+        // Check if session exists
+        const sessionCheck = await pool.query('SELECT * FROM sessions WHERE session_id = $1', [sessionId]);
+        if (sessionCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+        
+        // Delete related records in correct order
+        await pool.query('DELETE FROM attendance_records WHERE session_id = $1', [sessionId]);
+        await pool.query('DELETE FROM scans WHERE session_id = $1', [sessionId]);
+        await pool.query('DELETE FROM current_tokens WHERE session_id = $1', [sessionId]);
+        await pool.query('DELETE FROM sessions WHERE session_id = $1', [sessionId]);
+        
+        // Also remove from memory store
+        if (store.sessions[sessionId]) {
+            if (store.rotateIntervals[sessionId]) {
+                clearInterval(store.rotateIntervals[sessionId]);
+            }
+            if (store.openingTimers[sessionId]) {
+                clearTimeout(store.openingTimers[sessionId]);
+            }
+            if (store.closingTimers[sessionId]) {
+                clearTimeout(store.closingTimers[sessionId]);
+            }
+            delete store.sessions[sessionId];
+            delete store.currentToken[sessionId];
+            delete store.scans[sessionId];
+        }
+        
+        res.json({ success: true, message: 'Session deleted successfully' });
+    } catch (err) {
+        console.error('Delete session error:', err);
+        res.status(500).json({ error: 'Server error: ' + err.message });
+    }
+});
+
+// Override attendance record in history (for locked sessions)
+app.post('/api/faculty/override-history/:sessionId', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const { rollNo, status } = req.body;
+        
+        console.log(`Override history - session: ${sessionId}, rollNo: ${rollNo}, status: ${status}`);
+        
+        const validStatuses = ['Present', 'Late', 'Absent'];
+        if (!rollNo || !status) {
+            return res.status(400).json({ error: 'Roll number and status required' });
+        }
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+        
+        // Check if session exists and is locked
+        const sessionCheck = await pool.query('SELECT * FROM sessions WHERE session_id = $1 AND locked = true', [sessionId]);
+        if (sessionCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Locked session not found' });
+        }
+        
+        // Update attendance record
+        const result = await pool.query(
+            `UPDATE attendance_records 
+             SET status = $1 
+             WHERE session_id = $2 AND roll_no = $3
+             RETURNING *`,
+            [status, sessionId, rollNo]
+        );
+        
+        if (result.rows.length === 0) {
+            // If no record exists, create one
+            const studentRes = await pool.query('SELECT * FROM students WHERE roll_no = $1', [rollNo]);
+            const sessionRes = await pool.query('SELECT * FROM sessions WHERE session_id = $1', [sessionId]);
+            
+            if (studentRes.rows.length > 0 && sessionRes.rows.length > 0) {
+                await pool.query(
+                    `INSERT INTO attendance_records (session_id, roll_no, name, section, course_code, status, recorded_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                    [sessionId, rollNo, studentRes.rows[0].name, studentRes.rows[0].section, 
+                     sessionRes.rows[0].course_code, status, Date.now()]
+                );
+            } else {
+                return res.status(404).json({ error: 'Student record not found' });
+            }
+        }
+        
+        // Also update in-memory store if session exists there
+        if (store.sessions[sessionId]) {
+            const s = store.sessions[sessionId];
+            s.overrides = (s.overrides || []).filter(o => o.rollNo !== rollNo);
+            s.overrides.push({ rollNo, status, at: Date.now() });
+            await pool.query('UPDATE sessions SET overrides=$1 WHERE session_id=$2', 
+                [JSON.stringify(s.overrides), sessionId]);
+        }
+        
+        res.json({ success: true, message: `Override set to ${status} for ${rollNo}` });
+    } catch (err) {
+        console.error('Override history error:', err);
+        res.status(500).json({ error: 'Server error: ' + err.message });
+    }
+});
+
+// Get single session details for editing
+app.get('/api/faculty/session-details/:sessionId', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        
+        const sessionRes = await pool.query('SELECT * FROM sessions WHERE session_id = $1', [sessionId]);
+        if (sessionRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+        
+        const recordsRes = await pool.query('SELECT * FROM attendance_records WHERE session_id = $1 ORDER BY roll_no', [sessionId]);
+        
+        res.json({
+            session: sessionRes.rows[0],
+            records: recordsRes.rows
+        });
+    } catch (err) {
+        console.error('Session details error:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
 
 startServer();

@@ -944,7 +944,9 @@
         let tokenExpiry = null;
         let windowTimer = null;   // countdown interval for opening/closing 10-min window
         let windowEndTime = null;
-
+let tokenRefreshInterval = null;
+let tokenCountdownInterval = null;
+let remainingOpeningTime = null; 
         // ── TOAST ─────────────────────────────────────────────────────────────────────
         function toast(msg, type = '') {
             const t = document.getElementById('toast');
@@ -1023,14 +1025,25 @@
             el.classList.add('show');
         }
 
-        function doLogout() {
-            faculty = null; currentSession = null;
-            stopPolling(); stopWindowTimer();
-            document.getElementById('loginScreen').style.display = 'flex';
-            document.getElementById('loginError').classList.remove('show');
-            document.getElementById('loginId').value = '';
-            document.getElementById('loginPass').value = '';
-        }
+       function doLogout() {
+    faculty = null; 
+    currentSession = null;
+    stopAllTimers();
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('loginError').classList.remove('show');
+    document.getElementById('loginId').value = '';
+    document.getElementById('loginPass').value = '';
+}
+function stopAllTimers() {
+    if (pollInterval) clearInterval(pollInterval);
+    if (windowTimer) clearInterval(windowTimer);
+    if (tokenRefreshInterval) clearInterval(tokenRefreshInterval);
+    if (tokenCountdownInterval) clearInterval(tokenCountdownInterval);
+    pollInterval = null;
+    windowTimer = null;
+    tokenRefreshInterval = null;
+    tokenCountdownInterval = null;
+}
 
         // ── PAGE ROUTER ───────────────────────────────────────────────────────────────
         function showPage(page) {
@@ -1158,40 +1171,50 @@
                 </div>
             </div>`;
         }
-        async function startOpeningSession() {
-            const topic = document.getElementById('fTopic').value.trim();
-            const courseCode = document.getElementById('fCourse').value;
-            const section = document.getElementById('fSection').value;
-            const errEl = document.getElementById('startErr');
-            errEl.style.display = 'none';
+ async function startOpeningSession() {
+    const topic = document.getElementById('fTopic').value.trim();
+    const courseCode = document.getElementById('fCourse').value;
+    const section = document.getElementById('fSection').value;
+    const errEl = document.getElementById('startErr');
+    errEl.style.display = 'none';
 
-            if (!topic) { errEl.textContent = '⚠ Please enter a session topic'; errEl.style.display = 'block'; document.getElementById('fTopic').classList.add('err'); return; }
-            document.getElementById('fTopic').classList.remove('err');
+    if (!topic) { 
+        errEl.textContent = '⚠ Please enter a session topic'; 
+        errEl.style.display = 'block'; 
+        document.getElementById('fTopic').classList.add('err'); 
+        return; 
+    }
+    document.getElementById('fTopic').classList.remove('err');
 
-            const r = await fetch('/api/faculty/start-session', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ topic, courseCode, section, facultyId: faculty.id, facultyName: faculty.name })
-            });
-            const data = await r.json();
-            if (!r.ok) { toast('Error: ' + (data.error || 'Unknown error'), 'err'); return; }
+    const r = await fetch('/api/faculty/start-session', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic, courseCode, section, facultyId: faculty.id, facultyName: faculty.name })
+    });
+    const data = await r.json();
+    if (!r.ok) { toast('Error: ' + (data.error || 'Unknown error'), 'err'); return; }
 
-            // ✅ Set currentSession from the returned full session object
-            currentSession = data.session || {
-                sessionId: data.sessionId,
-                topic,
-                courseCode,
-                section,
-                status: 'opening',
-                startedAt: Date.now()
-            };
-            tokenExpiry = data.expiresAt;
-            renderLiveSession(document.getElementById('pageContent'));
-            updateQR(data.qrCode, data.token);
-            startWindowTimer(10 * 60 * 1000, 'opening');
-            startPolling();
-            toast('✅ Opening window started — 10 minutes');
-        }
-
+    currentSession = {
+        sessionId: data.sessionId,
+        topic: topic,
+        courseCode: courseCode,
+        section: section,
+        status: 'opening',
+        startedAt: Date.now()
+    };
+    tokenExpiry = data.expiresAt;
+    remainingOpeningTime = null; // Reset remaining time for new session
+    
+    renderLiveSession(document.getElementById('pageContent'));
+    updateQR(data.qrCode, data.token);
+    
+    // Start both timers
+    startWindowTimer(10 * 60 * 1000, 'opening');
+    startTokenRefresh();
+    startTokenCountdown();
+    startPolling();
+    
+    toast('✅ Opening window started — 10 minutes');
+}
 
         // ── LIVE SESSION ──────────────────────────────────────────────────────────────
         function renderLiveSession(c) {
@@ -1348,66 +1371,180 @@
         }
 
         // ── SESSION CONTROLS ──────────────────────────────────────────────────────────
-        async function closeOpeningWindow() {
-            const r = await fetch(`/api/faculty/lock-opening/${currentSession.sessionId}`, { method: 'POST' });
-            const d = await r.json();
-            if (!r.ok) { toast(d.error || 'Error', 'err'); return; }
-            currentSession.status = 'opening_locked';
-            stopWindowTimer();
-            updateActionRow();
-            updateWindowBadge('opening_locked');
-            updateWindowTimerBlock('opening_locked');
-            hideQRArea();
-            toast('🔒 Opening window closed');
+ async function closeOpeningWindow() {
+    const r = await fetch(`/api/faculty/lock-opening/${currentSession.sessionId}`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'Error', 'err'); return; }
+    
+    // Save remaining time before clearing
+    if (windowEndTime) {
+        remainingOpeningTime = Math.max(0, windowEndTime - Date.now());
+    }
+    
+    currentSession.status = 'opening_locked';
+    
+    if (windowTimer) clearInterval(windowTimer);
+    if (tokenRefreshInterval) clearInterval(tokenRefreshInterval);
+    
+    updateActionRow();
+    updateWindowBadge('opening_locked');
+    updateWindowTimerBlock('opening_locked');
+    hideQRArea();
+    
+    toast('🔒 Opening window closed');
+}
+async function resumeOpeningWindow() {
+    const r = await fetch(`/api/faculty/resume-opening/${currentSession.sessionId}`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'Error', 'err'); return; }
+    
+    currentSession.status = 'opening';
+    tokenExpiry = d.expiresAt;
+    
+    showQRArea();
+    
+    if (d.qrCode && d.token) {
+        updateQR(d.qrCode, d.token);
+    }
+    
+    if (windowTimer) clearInterval(windowTimer);
+    if (tokenRefreshInterval) clearInterval(tokenRefreshInterval);
+    
+    // Use saved remaining time if available, otherwise use full 10 minutes
+    let duration = 10 * 60 * 1000;
+    if (remainingOpeningTime && remainingOpeningTime > 0) {
+        duration = remainingOpeningTime;
+        remainingOpeningTime = null; // Reset after use
+    }
+    
+    startWindowTimer(duration, 'opening');
+    startTokenRefresh();
+    startTokenCountdown();
+    
+    updateActionRow();
+    updateWindowBadge('opening');
+    updateWindowTimerBlock('opening');
+    startPolling();
+    
+    toast('▶ Opening window resumed');
+}
+async function startClosingWindow() {
+    toast('⏰ Starting closing window...');
+    
+    const startClosingBtn = document.getElementById('startClosingBtn');
+    if (startClosingBtn) {
+        startClosingBtn.disabled = true;
+        startClosingBtn.textContent = 'Starting...';
+    }
+    
+    try {
+        const r = await fetch(`/api/faculty/start-closing/${currentSession.sessionId}`, { method: 'POST' });
+        const d = await r.json();
+        
+        if (!r.ok) { 
+            toast(d.error || 'Error', 'err');
+            if (startClosingBtn) {
+                startClosingBtn.disabled = false;
+                startClosingBtn.textContent = '▶ Start Closing Window (10 min)';
+            }
+            return; 
         }
-
-        async function resumeOpeningWindow() {
-            const r = await fetch(`/api/faculty/resume-opening/${currentSession.sessionId}`, { method: 'POST' });
-            const d = await r.json();
-            if (!r.ok) { toast(d.error || 'Error', 'err'); return; }
-            currentSession.status = 'opening';
-            tokenExpiry = d.expiresAt;
-            showQRArea();
+        
+        currentSession.status = 'closing';
+        
+        // IMPORTANT: Set token expiry from the fresh token
+        tokenExpiry = d.expiresAt;
+        
+        showQRArea();
+        
+        // Update QR immediately with fresh token
+        if (d.qrCode && d.token) {
             updateQR(d.qrCode, d.token);
-            startWindowTimer(10 * 60 * 1000, 'opening');
-            updateActionRow();
-            updateWindowBadge('opening');
-            updateWindowTimerBlock('opening');
-            startPolling();
-            toast('▶ Opening window resumed — 10 minutes');
         }
-
-        async function startClosingWindow() {
-            const r = await fetch(`/api/faculty/start-closing/${currentSession.sessionId}`, { method: 'POST' });
-            const d = await r.json();
-            if (!r.ok) { toast(d.error || 'Error', 'err'); return; }
-            currentSession.status = 'closing';
-            tokenExpiry = d.expiresAt;
-            showQRArea();
-            updateQR(d.qrCode, d.token);
-            startWindowTimer(10 * 60 * 1000, 'closing');
-            updateActionRow();
-            updateWindowBadge('closing');
-            updateWindowTimerBlock('closing');
-            startPolling();
-            toast('⏰ Closing window started — 10 minutes');
+        
+        // Stop existing timers
+        if (windowTimer) clearInterval(windowTimer);
+        if (tokenRefreshInterval) clearInterval(tokenRefreshInterval);
+        if (tokenCountdownInterval) clearInterval(tokenCountdownInterval);
+        
+        // Start fresh timers for closing window
+        startWindowTimer(10 * 60 * 1000, 'closing');
+        startTokenRefresh();
+        
+        // Force countdown to start with fresh expiry
+        // Small delay to ensure DOM is ready
+        setTimeout(() => {
+            // Force update countdown with current token expiry
+            if (tokenExpiry) {
+                const rem = Math.max(0, tokenExpiry - Date.now());
+                const pct = (rem / 30000) * 100;
+                const fill = document.getElementById('countdownFill');
+                const num = document.getElementById('countdownNum');
+                if (fill) {
+                    fill.style.width = pct + '%';
+                    fill.style.background = pct > 40 ? '#60a5fa' : pct > 15 ? '#f59e0b' : '#f87171';
+                }
+                if (num) num.textContent = Math.ceil(rem / 1000) + 's';
+            }
+            startTokenCountdown();
+        }, 50);
+        
+        updateActionRow();
+        updateWindowBadge('closing');
+        updateWindowTimerBlock('closing');
+        startPolling();
+        
+        toast('⏰ Closing window started — 10 minutes');
+        
+    } catch (err) {
+        console.error('Start closing error:', err);
+        toast('Error starting closing window', 'err');
+    } finally {
+        if (startClosingBtn) {
+            startClosingBtn.disabled = false;
         }
+    }
+}
 
-        async function lockAttendance() {
-            if (!confirm('Lock attendance? Students not scanned in any window will be marked ABSENT.\nP = both windows  |  L = one window  |  A = none')) return;
-            const r = await fetch(`/api/faculty/lock-session/${currentSession.sessionId}`, { method: 'POST' });
-            const d = await r.json();
-            if (!r.ok) { toast(d.error || 'Error', 'err'); return; }
-            currentSession.status = 'locked';
-            stopPolling(); stopWindowTimer();
-            updateActionRow();
-            updateWindowBadge('locked');
-            updateWindowTimerBlock('locked');
-            hideQRArea();
-            pollSession();
-            toast('🔒 Attendance locked successfully');
+// Update startTokenCountdown to use the current tokenExpiry directly
+function startTokenCountdown() {
+    if (tokenCountdownInterval) clearInterval(tokenCountdownInterval);
+    
+    tokenCountdownInterval = setInterval(() => {
+        if (!tokenExpiry) return;
+        const rem = Math.max(0, tokenExpiry - Date.now());
+        const pct = (rem / 30000) * 100;
+        const fill = document.getElementById('countdownFill');
+        const num = document.getElementById('countdownNum');
+        if (fill) {
+            fill.style.width = pct + '%';
+            fill.style.background = pct > 40 ? '#60a5fa' : pct > 15 ? '#f59e0b' : '#f87171';
         }
-
+        if (num) num.textContent = Math.ceil(rem / 1000) + 's';
+    }, 100);
+}
+async function lockAttendance() {
+    if (!confirm('Lock attendance? Students not scanned in any window will be marked ABSENT.\nP = both windows | L = one window | A = none')) return;
+    
+    const r = await fetch(`/api/faculty/lock-session/${currentSession.sessionId}`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'Error', 'err'); return; }
+    
+    currentSession.status = 'locked';
+    
+    stopPolling();
+    if (windowTimer) clearInterval(windowTimer);
+    if (tokenRefreshInterval) clearInterval(tokenRefreshInterval);
+    if (tokenCountdownInterval) clearInterval(tokenCountdownInterval);
+    
+    updateActionRow();
+    updateWindowBadge('locked');
+    updateWindowTimerBlock('locked');
+    hideQRArea();
+    pollSession();
+    
+    toast('🔒 Attendance locked successfully');
+}
         async function exportSession() {
             if (!currentSession) { toast('No session selected', 'err'); return; }
             window.open(`/api/faculty/export/${currentSession.sessionId}`, '_blank');
@@ -1512,48 +1649,115 @@
         }
 
         // ── TOKEN COUNTDOWN BAR ───────────────────────────────────────────────────────
-        let tokenCountdownInterval = null;
-        function startTokenCountdown() {
-            if (tokenCountdownInterval) clearInterval(tokenCountdownInterval);
-            tokenCountdownInterval = setInterval(() => {
-                if (!tokenExpiry) return;
-                const rem = Math.max(0, tokenExpiry - Date.now());
-                const pct = (rem / 30000) * 100;
-                const fill = document.getElementById('countdownFill');
-                const num = document.getElementById('countdownNum');
-                if (fill) { fill.style.width = pct + '%'; fill.style.background = pct > 40 ? '#60a5fa' : pct > 15 ? '#f59e0b' : '#f87171'; }
-                if (num) num.textContent = Math.ceil(rem / 1000) + 's';
-            }, 300);
+   function startTokenCountdown() {
+    if (tokenCountdownInterval) clearInterval(tokenCountdownInterval);
+    
+    // Force an immediate token fetch to get fresh expiry
+    const resetAndStart = async () => {
+        if (!currentSesId) return;
+        try {
+            const r = await fetch(`/api/faculty/token/${currentSesId}`);
+            if (!r.ok) return;
+            const data = await r.json();
+            if (data.expiresAt) {
+                tokenExpiry = data.expiresAt;
+            }
+        } catch (e) {}
+    };
+    
+    resetAndStart();
+    
+    tokenCountdownInterval = setInterval(() => {
+        if (!tokenExpiry) return;
+        const rem = Math.max(0, tokenExpiry - Date.now());
+        const pct = (rem / 30000) * 100;
+        const fill = document.getElementById('countdownFill');
+        const num = document.getElementById('countdownNum');
+        if (fill) {
+            fill.style.width = pct + '%';
+            fill.style.background = pct > 40 ? '#60a5fa' : pct > 15 ? '#f59e0b' : '#f87171';
         }
-
-        // ── 10-MIN WINDOW TIMER ───────────────────────────────────────────────────────
-        function startWindowTimer(durationMs, windowType) {
-            stopWindowTimer();
-            windowEndTime = Date.now() + durationMs;
-            updateWindowTimerBlock(windowType);
-            updateWindowBadge(windowType);
-
-            windowTimer = setInterval(() => {
-                const remaining = Math.max(0, windowEndTime - Date.now());
-                const m = Math.floor(remaining / 60000);
-                const s = Math.floor((remaining % 60000) / 1000);
-                const clk = document.getElementById('windowClock');
-                if (clk) clk.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-                if (remaining <= 0) {
-                    stopWindowTimer();
-                    if (windowType === 'opening' && currentSession?.status === 'opening') {
-                        // Auto-close triggered server-side; just update UI
-                        currentSession.status = 'opening_locked';
-                        updateActionRow(); updateWindowBadge('opening_locked'); updateWindowTimerBlock('opening_locked'); hideQRArea();
-                        toast('⏱ Opening window auto-closed');
-                    } else if (windowType === 'closing' && currentSession?.status === 'closing') {
-                        toast('⏱ Closing window ended — attendance auto-locked');
-                    }
-                }
-            }, 500);
+        if (num) num.textContent = Math.ceil(rem / 1000) + 's';
+    }, 100);
+}
+function startTokenRefresh() {
+    if (tokenRefreshInterval) clearInterval(tokenRefreshInterval);
+    
+    const fetchToken = async () => {
+        if (!currentSesId) return;
+        try {
+            const r = await fetch(`/api/faculty/token/${currentSesId}`);
+            if (!r.ok) return;
+            const data = await r.json();
+            const tokenDisp = document.getElementById('tokenDisp');
+            const qrWrap = document.getElementById('qrImgWrap');
+            
+            if (tokenDisp && data.token) {
+                tokenDisp.textContent = data.token;
+            }
+            if (qrWrap && data.qrCode) {
+                qrWrap.innerHTML = `<img src="${data.qrCode}" style="width:188px;height:188px">`;
+            }
+            if (data.expiresAt) {
+                tokenExpiry = data.expiresAt;
+            }
+        } catch (e) {
+            console.error('Token fetch error:', e);
         }
+    };
+    
+    // Fetch immediately
+    fetchToken();
+    
+    // Then every 1 seconds
+    tokenRefreshInterval = setInterval(fetchToken, 1000);
+}
+   
+// ── 10-MIN WINDOW TIMER ───────────────────────────────────────────────────────
+   function startWindowTimer(durationMs, windowType) {
+    if (windowTimer) {
+        clearInterval(windowTimer);
+        windowTimer = null;
+    }
+    
+    windowEndTime = Date.now() + durationMs;
+    
+    // Update UI immediately
+    updateWindowTimerBlock(windowType);
+    updateWindowBadge(windowType);
+    
+    const updateClock = () => {
+        const remaining = Math.max(0, windowEndTime - Date.now());
+        const m = Math.floor(remaining / 60000);
+        const s = Math.floor((remaining % 60000) / 1000);
+        const clk = document.getElementById('windowClock');
+        if (clk) {
+            clk.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+        
+        if (remaining <= 0) {
+            clearInterval(windowTimer);
+            windowTimer = null;
+            
+            if (windowType === 'opening' && currentSession?.status === 'opening') {
+                // Auto-close opening window
+                closeOpeningWindowAuto();
+            } else if (windowType === 'closing' && currentSession?.status === 'closing') {
+                // Auto-lock attendance when closing window ends
+                toast('⏱ Closing window ended — locking attendance');
+                lockAttendance();
+            }
+        }
+    };
+    
+    // Call immediately to show 10:00
+    updateClock();
+    
+    // Then update every second
+    windowTimer = setInterval(updateClock, 1000);
+}
 
-        function stopWindowTimer() {
+function stopWindowTimer() {
             if (windowTimer) { clearInterval(windowTimer); windowTimer = null; }
         }
 
@@ -1606,120 +1810,249 @@
             }
         }
 
-        // ── HISTORY PAGE ──────────────────────────────────────────────────────────────
-        async function renderHistoryPage(c) {
-            c.innerHTML = '<div style="text-align:center;padding:48px;color:var(--muted)">Loading history…</div>';
-            try {
-                const r = await fetch(`/api/faculty/history?facultyId=${faculty.id}`);
-                if (!r.ok) { c.innerHTML = '<div style="padding:40px;color:var(--red)">Failed to load history.</div>'; return; }
-                const sessions = await r.json();
+async function renderHistoryPage(c) {
+    c.innerHTML = '<div style="text-align:center;padding:48px;color:var(--muted)">Loading history…</div>';
+    try {
+        const r = await fetch(`/api/faculty/history?facultyId=${faculty.id}`);
+        if (!r.ok) { c.innerHTML = '<div style="padding:40px;color:var(--red)">Failed to load history.</div>'; return; }
+        const sessions = await r.json();
 
-                if (!sessions.length) {
-                    c.innerHTML = `<div style="text-align:center;padding:60px">
-                    <div style="font-size:52px;opacity:.3;margin-bottom:16px">📋</div>
-                    <div style="font-size:20px;font-weight:600;margin-bottom:8px">No History Yet</div>
-                    <div style="font-size:14px;color:var(--muted)">Locked sessions will appear here.</div>
-                </div>`;
-                    return;
-                }
+        if (!sessions.length) {
+            c.innerHTML = `<div style="text-align:center;padding:60px">
+                <div style="font-size:52px;opacity:.3;margin-bottom:16px">📋</div>
+                <div style="font-size:20px;font-weight:600;margin-bottom:8px">No History Yet</div>
+                <div style="font-size:14px;color:var(--muted)">Locked sessions will appear here.</div>
+            </div>`;
+            return;
+        }
 
-                const courses = [...new Set(sessions.map(s => s.courseCode))];
-                const sections = [...new Set(sessions.map(s => s.section))];
+        const courses = [...new Set(sessions.map(s => s.courseCode))];
+        const sections = [...new Set(sessions.map(s => s.section))];
 
-                c.innerHTML = `
-                    <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:flex-end">
-                        <button class="btn btn-outline btn-sm" onclick="renderHistoryPage(document.getElementById('pageContent'))">↻ Refresh</button>
-                        <button class="btn btn-primary btn-sm" onclick="showImportModal()">📥 Import Excel</button>
-                        <button class="btn btn-success btn-sm" onclick="exportAttendanceSheet()">📤 Export Full Sheet</button>
-                    </div>
-                <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:flex-end">
-                    <div style="flex:1;min-width:140px">
-                        <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">Course</label>
-                        <select id="hCourse" onchange="applyHistFilter()" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px">
-                            <option value="">All Courses</option>
-                            ${courses.map(c2 => `<option value="${c2}">${c2}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div style="flex:1;min-width:140px">
-                        <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">Section</label>
-                        <select id="hSection" onchange="applyHistFilter()" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px">
-                            <option value="">All Sections</option>
-                            ${sections.map(s2 => `<option value="${s2}">${s2}</option>`).join('')}
-                        </select>
-                    </div>
-                    <button class="btn btn-outline btn-sm" onclick="renderHistoryPage(document.getElementById('pageContent'))">↻ Refresh</button>
-<button class="btn btn-success btn-sm" onclick="exportCumulativeSheet()" title="Download full attendance sheet with all sessions as date columns">📥 Full Sheet</button>
+        c.innerHTML = `
+            <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:flex-end">
+                <button class="btn btn-outline btn-sm" onclick="renderHistoryPage(document.getElementById('pageContent'))">↻ Refresh</button>
+                <button class="btn btn-primary btn-sm" onclick="showImportModal()">📥 Import Excel</button>
+                <button class="btn btn-success btn-sm" onclick="exportAttendanceSheet()">📤 Export Full Sheet</button>
+            </div>
+            <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:flex-end">
+                <div style="flex:1;min-width:140px">
+                    <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">Course</label>
+                    <select id="hCourse" onchange="applyHistFilter()" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+                        <option value="">All Courses</option>
+                        ${courses.map(c2 => `<option value="${c2}">${c2}</option>`).join('')}
+                    </select>
                 </div>
-                <div id="histCards"></div>`;
+                <div style="flex:1;min-width:140px">
+                    <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">Section</label>
+                    <select id="hSection" onchange="applyHistFilter()" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+                        <option value="">All Sections</option>
+                        ${sections.map(s2 => `<option value="${s2}">${s2}</option>`).join('')}
+                    </select>
+                </div>
+                <button class="btn btn-outline btn-sm" onclick="renderHistoryPage(document.getElementById('pageContent'))">↻ Refresh</button>
+                <button class="btn btn-success btn-sm" onclick="exportCumulativeSheet()" title="Download full attendance sheet with all sessions as date columns">📥 Full Sheet</button>
+            </div>
+            <div id="histCards"></div>`;
 
-                window._histSessions = sessions;
-                applyHistFilter();
-            } catch (e) {
-                c.innerHTML = '<div style="padding:40px;color:var(--red)">Error loading history.</div>';
-            }
-        }
+        window._histSessions = sessions;
+        applyHistFilter();
+    } catch (e) {
+        c.innerHTML = '<div style="padding:40px;color:var(--red)">Error loading history.</div>';
+    }
+}
 
-        function applyHistFilter() {
-            const course = document.getElementById('hCourse')?.value || '';
-            const section = document.getElementById('hSection')?.value || '';
-            let filtered = (window._histSessions || []);
-            if (course) filtered = filtered.filter(s => s.courseCode === course);
-            if (section) filtered = filtered.filter(s => s.section === section);
-            renderHistCards(filtered);
-        }
+function applyHistFilter() {
+    const course = document.getElementById('hCourse')?.value || '';
+    const section = document.getElementById('hSection')?.value || '';
+    let filtered = (window._histSessions || []);
+    if (course) filtered = filtered.filter(s => s.courseCode === course);
+    if (section) filtered = filtered.filter(s => s.section === section);
+    renderHistCards(filtered);
+}
 
-        function renderHistCards(sessions) {
-            const container = document.getElementById('histCards');
-            if (!container) return;
-            if (!sessions.length) { container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">No sessions match the filter.</div>'; return; }
+function renderHistCards(sessions) {
+    const container = document.getElementById('histCards');
+    if (!container) return;
+    if (!sessions.length) { 
+        container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">No sessions match the filter.</div>'; 
+        return; 
+    }
 
-            container.innerHTML = sessions.map(s => {
-                const dt = new Date(Number(s.startedAt));
-                const dateStr = dt.toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' });
-                const timeStr = dt.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' });
-                const pct = s.total ? Math.round(((s.present + s.late) / s.total) * 100) : 0;
+    container.innerHTML = sessions.map(s => {
+        const dt = new Date(Number(s.startedAt));
+        const dateStr = dt.toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' });
+        const timeStr = dt.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' });
+        const pct = s.total ? Math.round(((s.present + s.late) / s.total) * 100) : 0;
 
-                const rows = s.records.map(r => {
-                    let sty = 'background:#fee2e2;color:#b91c1c', lbl = 'A';
-                    if (r.status === 'Present') { sty = 'background:#dcfce7;color:#15803d'; lbl = 'P'; }
-                    else if (r.status === 'Late') { sty = 'background:#fef9c3;color:#854d0e'; lbl = 'L'; }
-                    return `<tr>
-                    <td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-family:monospace;font-size:12px">${r.rollNo}</td>
-                    <td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-size:13px">${r.name}</td>
-                    <td style="padding:8px 14px;border-bottom:1px solid #f1f5f9">
-                        <span title="${r.status}" style="display:inline-block;padding:2px 10px;border-radius:5px;font-size:11px;font-weight:700;${sty}">${lbl} — ${r.status}</span>
-                    </td>
-                </tr>`;
-                }).join('');
+        // Use records AS IS from database (already sorted by roll_no)
+        const rows = s.records.map(r => {
+            let sty = 'background:#fee2e2;color:#b91c1c', lbl = 'A';
+            if (r.status === 'Present') { sty = 'background:#dcfce7;color:#15803d'; lbl = 'P'; }
+            else if (r.status === 'Late') { sty = 'background:#fef9c3;color:#854d0e'; lbl = 'L'; }
+            return `<tr>
+                <td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-family:monospace;font-size:12px">${r.rollNo}</td>
+                <td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-size:13px">${r.name}</td>
+                <td style="padding:8px 14px;border-bottom:1px solid #f1f5f9">
+                    <span title="${r.status}" style="display:inline-block;padding:2px 10px;border-radius:5px;font-size:11px;font-weight:700;${sty}">${lbl} — ${r.status}</span>
+                </td>
+                <td style="padding:8px 14px;border-bottom:1px solid #f1f5f9">
+                    <button class="btn btn-outline btn-sm" onclick="showHistoryOverride('${s.sessionId}','${r.rollNo}','${r.name}','${r.status}')" style="padding:3px 8px;font-size:11px">✏️ Override</button>
+                </td>
+            </tr>`;
+        }).join('');
 
-                return `<div class="hist-card">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:14px">
-                    <div>
-                        <div style="font-size:16px;font-weight:700;margin-bottom:4px">${s.topic}</div>
-                        <div style="font-size:12px;color:var(--muted)">${s.courseCode} · ${s.section} · ${dateStr}, ${timeStr}</div>
-                        <div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap">
-                            <span style="font-size:13px;color:var(--green);font-weight:600">✅ ${s.present} Present</span>
-                            <span style="font-size:13px;color:var(--yellow);font-weight:600">⏰ ${s.late} Late</span>
-                            <span style="font-size:13px;color:var(--red);font-weight:600">❌ ${s.absent} Absent</span>
-                            <span style="font-size:13px;color:var(--muted)">/ ${s.total} total · <strong>${pct}%</strong></span>
-                        </div>
+        return `<div class="hist-card" id="hist-card-${s.sessionId}">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+                <div>
+                    <div style="font-size:16px;font-weight:700;margin-bottom:4px">${s.topic}</div>
+                    <div style="font-size:12px;color:var(--muted)">${s.courseCode} · ${s.section} · ${dateStr}, ${timeStr}</div>
+                    <div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap">
+                        <span style="font-size:13px;color:var(--green);font-weight:600">✅ ${s.present} Present</span>
+                        <span style="font-size:13px;color:var(--yellow);font-weight:600">⏰ ${s.late} Late</span>
+                        <span style="font-size:13px;color:var(--red);font-weight:600">❌ ${s.absent} Absent</span>
+                        <span style="font-size:13px;color:var(--muted)">/ ${s.total} total · <strong>${pct}%</strong></span>
                     </div>
+                </div>
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-danger btn-sm" onclick="deleteSession('${s.sessionId}')" style="background:#dc2626;color:white">🗑️ Delete Session</button>
                     <button class="btn btn-success btn-sm" onclick="window.open('/api/faculty/export/${s.sessionId}','_blank')">📊 Export Excel</button>
                 </div>
-                <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto">
-                    <table style="width:100%;border-collapse:collapse">
-                        <thead><tr style="background:#f8fafc">
-                            <th style="text-align:left;padding:9px 14px;font-size:11px;font-weight:600;color:var(--muted)">Roll No.</th>
-                            <th style="text-align:left;padding:9px 14px;font-size:11px;font-weight:600;color:var(--muted)">Name</th>
-                            <th style="text-align:left;padding:9px 14px;font-size:11px;font-weight:600;color:var(--muted)">Status</th>
-                        </tr></thead>
-                        <tbody>${rows}</tbody>
-                    </table>
-                </div>
-            </div>`;
-            }).join('');
+            </div>
+            <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto">
+                <table style="width:100%;border-collapse:collapse">
+                    <thead><tr style="background:#f8fafc">
+                        <th style="text-align:left;padding:9px 14px;font-size:11px;font-weight:600;color:var(--muted)">Roll No.</th>
+                        <th style="text-align:left;padding:9px 14px;font-size:11px;font-weight:600;color:var(--muted)">Name</th>
+                        <th style="text-align:left;padding:9px 14px;font-size:11px;font-weight:600;color:var(--muted)">Status</th>
+                        <th style="text-align:left;padding:9px 14px;font-size:11px;font-weight:600;color:var(--muted)">Action</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        </div>`;
+    }).join('');
+}
+// Delete session function
+async function deleteSession(sessionId) {
+    if (!confirm('⚠️ Are you sure you want to delete this entire session? This action cannot be undone and will remove all attendance records for this session.')) {
+        return;
+    }
+    
+    toast('Deleting session...');
+    
+    try {
+        const response = await fetch(`/api/faculty/session/${sessionId}`, {
+            method: 'DELETE'
+        });
+        
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('Non-JSON response:', text.substring(0, 200));
+            throw new Error('Server returned an error page');
         }
-async function uploadAttendanceSheet() {
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            toast('✅ Session deleted successfully');
+            // Refresh the history page
+            if (typeof renderHistoryPage === 'function') {
+                renderHistoryPage(document.getElementById('pageContent'));
+            } else {
+                location.reload();
+            }
+        } else {
+            toast('❌ ' + (data.error || 'Delete failed'), 'err');
+        }
+    } catch (err) {
+        console.error('Delete error:', err);
+        toast('❌ ' + err.message, 'err');
+    }
+}
+function showHistoryOverride(sessionId, rollNo, studentName, currentStatus) {
+    // Create modal for override
+    const modalHtml = `
+        <div id="historyOverrideModal" class="overlay show" style="display:flex">
+            <div class="modal">
+                <h3>✏️ Override Attendance</h3>
+                <div class="fgroup">
+                    <label>Student</label>
+                    <input id="histOvName" value="${studentName}" disabled>
+                </div>
+                <div class="fgroup">
+                    <label>Roll No</label>
+                    <input id="histOvRoll" value="${rollNo}" disabled>
+                </div>
+                <div class="fgroup">
+                    <label>Current Status</label>
+                    <input value="${currentStatus}" disabled style="background:#f3f4f6">
+                </div>
+                <div class="fgroup">
+                    <label>Change to</label>
+                    <select id="histOvStatus">
+                        <option value="Present">Present (P)</option>
+                        <option value="Late">Late (L)</option>
+                        <option value="Absent">Absent (A)</option>
+                    </select>
+                </div>
+                <div class="modal-actions" style="margin-top:20px">
+                    <button class="btn btn-outline" onclick="closeHistoryOverride()">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitHistoryOverride('${sessionId}', '${rollNo}')">Save Override</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function closeHistoryOverride() {
+    const modal = document.getElementById('historyOverrideModal');
+    if (modal) modal.remove();
+}
+
+async function submitHistoryOverride(sessionId, rollNo) {
+    const newStatus = document.getElementById('histOvStatus').value;
+    
+    toast('Saving override...');
+    
+    try {
+        const response = await fetch(`/api/faculty/override-history/${sessionId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rollNo, status: newStatus })
+        });
+        
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('Non-JSON response:', text.substring(0, 200));
+            throw new Error('Server returned an error page. Please check server logs.');
+        }
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            toast(`✅ Attendance updated to ${newStatus}`);
+            closeHistoryOverride();
+            // Refresh the history page
+            if (typeof renderHistoryPage === 'function') {
+                renderHistoryPage(document.getElementById('pageContent'));
+            } else {
+                location.reload();
+            }
+        } else {
+            toast('❌ ' + (data.error || 'Override failed'), 'err');
+        }
+    } catch (err) {
+        console.error('Override error:', err);
+        toast('❌ ' + err.message, 'err');
+    }
+}
+
+        async function uploadAttendanceSheet() {
     const fileInput = document.getElementById('importFile');
     const section = document.getElementById('importSection').value;
     
