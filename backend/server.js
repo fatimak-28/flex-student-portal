@@ -871,35 +871,6 @@ async function exportToExcel(sessionId) {
 // ============ IMPORT/EXPORT ENDPOINTS ============
 
 // Get available sessions for import (with dates)
-app.get('/api/faculty/available-sessions', async (req, res) => {
-    try {
-        const { section, courseCode, facultyId } = req.query;
-        
-        let sessionsQuery = 'SELECT * FROM sessions WHERE locked=true';
-        const params = [];
-        if (section) { params.push(section); sessionsQuery += ` AND section=$${params.length}`; }
-        if (courseCode) { params.push(courseCode); sessionsQuery += ` AND course_code=$${params.length}`; }
-        sessionsQuery += ' ORDER BY started_at ASC';
-        
-        const sessionsRes = await pool.query(sessionsQuery, params);
-        const sessions = sessionsRes.rows;
-        
-        const availableSessions = sessions.map(s => ({
-            sessionId: s.session_id,
-            topic: s.topic,
-            date: new Date(Number(s.started_at)).toLocaleDateString('en-GB'),
-            startedAt: s.started_at,
-            courseCode: s.course_code,
-            section: s.section
-        }));
-        
-        res.json(availableSessions);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error' });
-    }
-});
-
 // Add this helper function BEFORE the import endpoint
 async function processAttendanceExcel(filePath, section, courseCode, selectedDates) {
     if (!fs.existsSync(filePath)) {
