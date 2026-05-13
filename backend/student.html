@@ -854,18 +854,58 @@
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
-                    let width = Math.min(img.width, 500);
-                    let height = (img.height * width) / img.width;
-                    canvas.width = width; canvas.height = height;
-                    ctx.drawImage(img, 0, 0, width, height);
-                    const imageData = ctx.getImageData(0, 0, width, height);
-                    const code = jsQR(imageData.data, imageData.width, imageData.height);
-                    if (code) {
-                        parseQRData(code.data);
-                    } else {
-                        previewDiv.innerHTML = `<div class="preview-area"><div style="color:#dc2626;">❌ No QR code found</div><button class="btn btn-outline" onclick="closePreview()">Try Again</button></div>`;
-                    }
-                    URL.revokeObjectURL(imgUrl);
+                    const getOrientation = (file, cb) => {
+                        const reader = new FileReader();
+                        reader.onload = e => {
+                            const view = new DataView(e.target.result);
+                            if (view.getUint16(0, false) !== 0xFFD8) return cb(-2);
+                            const length = view.byteLength;
+                            let offset = 2;
+                            while (offset < length) {
+                                if (view.getUint16(offset + 2, false) <= 8) return cb(-1);
+                                const marker = view.getUint16(offset, false);
+                                offset += 2;
+                                if (marker === 0xFFE1) {
+                                    if (view.getUint32(offset += 2, false) !== 0x45786966) return cb(-1);
+                                    const little = view.getUint16(offset += 6, false) === 0x4949;
+                                    offset += view.getUint32(offset + 4, little);
+                                    const tags = view.getUint16(offset, little);
+                                    offset += 2;
+                                    for (let i = 0; i < tags; i++)
+                                        if (view.getUint16(offset + (i * 12), little) === 0x0112)
+                                            return cb(view.getUint16(offset + (i * 12) + 8, little));
+                                } else if ((marker & 0xFF00) !== 0xFF00) break;
+                                else offset += view.getUint16(offset, false);
+                            }
+                            return cb(-1);
+                        };
+                        reader.readAsArrayBuffer(file.slice(0, 65536));
+                    };
+                    getOrientation(file, orientation => {
+                        let width = Math.min(img.width, 500);
+                        let height = (img.height * width) / img.width;
+                        const swapped = orientation >= 5 && orientation <= 8;
+                        canvas.width = swapped ? height : width;
+                        canvas.height = swapped ? width : height;
+                        ctx.save();
+                        if (orientation === 2) { ctx.transform(-1, 0, 0, 1, canvas.width, 0); }
+                        else if (orientation === 3) { ctx.transform(-1, 0, 0, -1, canvas.width, canvas.height); }
+                        else if (orientation === 4) { ctx.transform(1, 0, 0, -1, 0, canvas.height); }
+                        else if (orientation === 5) { ctx.transform(0, 1, 1, 0, 0, 0); }
+                        else if (orientation === 6) { ctx.transform(0, 1, -1, 0, canvas.height, 0); }
+                        else if (orientation === 7) { ctx.transform(0, -1, -1, 0, canvas.height, canvas.width); }
+                        else if (orientation === 8) { ctx.transform(0, -1, 1, 0, 0, canvas.width); }
+                        ctx.drawImage(img, 0, 0, width, height);
+                        ctx.restore();
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const code = jsQR(imageData.data, imageData.width, imageData.height);
+                        if (code) {
+                            parseQRData(code.data);
+                        } else {
+                            previewDiv.innerHTML = `<div class="preview-area"><div style="color:#dc2626;">❌ No QR code found</div><button class="btn btn-outline" onclick="closePreview()">Try Again</button></div>`;
+                        }
+                        URL.revokeObjectURL(imgUrl);
+                    });
                 };
                 img.onerror = () => { previewDiv.innerHTML = `<div>Image error</div><button class="btn btn-outline" onclick="closePreview()">Close</button>`; };
             };

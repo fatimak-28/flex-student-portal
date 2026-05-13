@@ -1360,7 +1360,7 @@ function stopAllTimers() {
             } else if (status === 'closing') {
                 block.style.background = 'linear-gradient(135deg,#3a2000,#4a2800)';
                 if (label) label.textContent = 'Closing Window — Time Remaining';
-                if (desc) desc.innerHTML = '⚠️ Students scanning now will be marked <strong>LATE</strong>';
+                if (desc) desc.innerHTML = '';
             } else if (status === 'locked') {
                 block.style.background = 'linear-gradient(135deg,#1e293b,#334155)';
                 if (label) label.textContent = 'Attendance Locked';
