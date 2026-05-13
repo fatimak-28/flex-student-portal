@@ -946,7 +946,8 @@
         let windowEndTime = null;
 let tokenRefreshInterval = null;
 let tokenCountdownInterval = null;
-let remainingOpeningTime = null; 
+let remainingOpeningTime = null;
+let tokenRotationMs = 30000;
         // ── TOAST ─────────────────────────────────────────────────────────────────────
         function toast(msg, type = '') {
             const t = document.getElementById('toast');
@@ -1151,7 +1152,18 @@ function stopAllTimers() {
                     </div>
                 </div>
                 <div id="startErr" style="color:var(--red);font-size:13px;margin-bottom:10px;display:none"></div>
-                <button class="btn btn-primary" onclick="startOpeningSession()">▶ Start Opening Window (10 min)</button>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                    <button class="btn btn-primary" onclick="startOpeningSession()">▶ Start Opening Window (10 min)</button>
+                    <button class="btn btn-outline btn-sm" onclick="document.getElementById('qrSettingsPanel').style.display=document.getElementById('qrSettingsPanel').style.display==='none'?'block':'none'" title="QR Settings">⚙️ QR Settings</button>
+                </div>
+                <div id="qrSettingsPanel" style="display:none;margin-top:12px;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:14px">
+                    <label style="font-size:13px;font-weight:600">QR Token Rotation Interval (seconds)</label>
+                    <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+                        <input type="number" id="qrIntervalInput" value="30" min="10" max="120" style="width:80px;padding:6px;border:1px solid var(--border);border-radius:6px;font-size:14px">
+                        <button class="btn btn-outline btn-sm" onclick="saveQrInterval()">Save</button>
+                        <span id="qrIntervalStatus" style="font-size:12px;color:var(--muted)">Default: 30s</span>
+                    </div>
+                </div>
             </div>
             <div class="card">
                 <div class="card-title">Two-Session Attendance Flow</div>
@@ -1171,6 +1183,17 @@ function stopAllTimers() {
                 </div>
             </div>`;
         }
+ let qrInterval = 30;
+ function saveQrInterval() {
+    const val = parseInt(document.getElementById('qrIntervalInput').value);
+    if (!val || val < 10 || val > 120) { toast('Enter a value between 10 and 120 seconds', 'err'); return; }
+    qrInterval = val;
+    document.getElementById('qrIntervalStatus').textContent = `Set to ${val}s ✓`;
+    document.getElementById('qrIntervalStatus').style.color = 'green';
+    const lbl = document.getElementById('rotationLabel');
+    if (lbl) lbl.textContent = `${val} seconds`;
+    toast(`QR rotation set to ${val} seconds`);
+ }
  async function startOpeningSession() {
     const topic = document.getElementById('fTopic').value.trim();
     const courseCode = document.getElementById('fCourse').value;
@@ -1188,7 +1211,7 @@ function stopAllTimers() {
 
     const r = await fetch('/api/faculty/start-session', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, courseCode, section, facultyId: faculty.id, facultyName: faculty.name })
+        body: JSON.stringify({ topic, courseCode, section, facultyId: faculty.id, facultyName: faculty.name, tokenRotation: qrInterval })
     });
     const data = await r.json();
     if (!r.ok) { toast('Error: ' + (data.error || 'Unknown error'), 'err'); return; }
@@ -1202,6 +1225,7 @@ function stopAllTimers() {
         startedAt: Date.now()
     };
     tokenExpiry = data.expiresAt;
+    tokenRotationMs = data.rotationMs || 30000;
     remainingOpeningTime = null; // Reset remaining time for new session
     
     renderLiveSession(document.getElementById('pageContent'));
@@ -1256,7 +1280,7 @@ function stopAllTimers() {
                         <div class="countdown-num" id="countdownNum">30s</div>
                     </div>
                     <div style="font-size:12px;color:rgba(255,255,255,.5);line-height:1.7">
-                        Token rotates every <strong style="color:#fff">30 seconds</strong>.<br>
+                        Token rotates every <strong style="color:#fff" id="rotationLabel">${qrInterval} seconds</strong>.<br>
                         Students enter token manually or scan QR.
                     </div>
                 </div>
@@ -1454,6 +1478,7 @@ async function startClosingWindow() {
         
         // IMPORTANT: Set token expiry from the fresh token
         tokenExpiry = d.expiresAt;
+        if (d.rotationMs) tokenRotationMs = d.rotationMs;
         
         showQRArea();
         
@@ -1477,7 +1502,7 @@ async function startClosingWindow() {
             // Force update countdown with current token expiry
             if (tokenExpiry) {
                 const rem = Math.max(0, tokenExpiry - Date.now());
-                const pct = (rem / 30000) * 100;
+                const pct = (rem / tokenRotationMs) * 100;
                 const fill = document.getElementById('countdownFill');
                 const num = document.getElementById('countdownNum');
                 if (fill) {
@@ -1509,11 +1534,11 @@ async function startClosingWindow() {
 // Update startTokenCountdown to use the current tokenExpiry directly
 function startTokenCountdown() {
     if (tokenCountdownInterval) clearInterval(tokenCountdownInterval);
-    
+
     tokenCountdownInterval = setInterval(() => {
         if (!tokenExpiry) return;
         const rem = Math.max(0, tokenExpiry - Date.now());
-        const pct = (rem / 30000) * 100;
+        const pct = (rem / tokenRotationMs) * 100;
         const fill = document.getElementById('countdownFill');
         const num = document.getElementById('countdownNum');
         if (fill) {
@@ -1682,34 +1707,39 @@ async function lockAttendance() {
 }
 function startTokenRefresh() {
     if (tokenRefreshInterval) clearInterval(tokenRefreshInterval);
-    
+    let lastKnownToken = null;
+
     const fetchToken = async () => {
         if (!currentSesId) return;
         try {
-            const r = await fetch(`/api/faculty/token/${currentSesId}`);
+            const r = await fetch(`/api/faculty/token/${currentSesId}?qr=0`);
             if (!r.ok) return;
             const data = await r.json();
-            const tokenDisp = document.getElementById('tokenDisp');
-            const qrWrap = document.getElementById('qrImgWrap');
-            
-            if (tokenDisp && data.token) {
-                tokenDisp.textContent = data.token;
-            }
-            if (qrWrap && data.qrCode) {
-                qrWrap.innerHTML = `<img src="${data.qrCode}" style="width:188px;height:188px">`;
-            }
-            if (data.expiresAt) {
-                tokenExpiry = data.expiresAt;
+
+            if (data.expiresAt) tokenExpiry = data.expiresAt;
+
+            // Only fetch QR image when token actually changes
+            if (data.token && data.token !== lastKnownToken) {
+                lastKnownToken = data.token;
+                const tokenDisp = document.getElementById('tokenDisp');
+                if (tokenDisp) tokenDisp.textContent = data.token;
+
+                // Fetch QR separately only on token change
+                const qr = await fetch(`/api/faculty/token/${currentSesId}?qr=1`);
+                if (qr.ok) {
+                    const qd = await qr.json();
+                    const qrWrap = document.getElementById('qrImgWrap');
+                    if (qrWrap && qd.qrCode) {
+                        qrWrap.innerHTML = `<img src="${qd.qrCode}" style="width:188px;height:188px">`;
+                    }
+                }
             }
         } catch (e) {
             console.error('Token fetch error:', e);
         }
     };
-    
-    // Fetch immediately
+
     fetchToken();
-    
-    // Then every 1 seconds
     tokenRefreshInterval = setInterval(fetchToken, 1000);
 }
    

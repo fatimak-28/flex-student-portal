@@ -121,7 +121,7 @@ const store = {
 const token8 = () => Math.random().toString(36).substring(2, 10).toUpperCase();
 const sesId = () => 'SES-' + Date.now();
 
-function startTokenRotation(sessionId) {
+function startTokenRotation(sessionId, intervalMs = 30000) {
     if (store.rotateIntervals[sessionId]) clearInterval(store.rotateIntervals[sessionId]);
     store.rotateIntervals[sessionId] = setInterval(async () => {
         const s = store.sessions[sessionId];
@@ -132,10 +132,10 @@ function startTokenRotation(sessionId) {
         }
         const nt = token8();
         const now = Date.now();
-        store.currentToken[sessionId] = { token: nt, generatedAt: now, expiresAt: now + 30000 };
+        store.currentToken[sessionId] = { token: nt, generatedAt: now, expiresAt: now + intervalMs };
         await pool.query('UPDATE current_tokens SET token=$1, generated_at=$2, expires_at=$3 WHERE session_id=$4',
-            [nt, now, now + 30000, sessionId]);
-    }, 30000);
+            [nt, now, now + intervalMs, sessionId]);
+    }, intervalMs);
 }
 
 async function lockSession(sessionId) {
@@ -532,7 +532,7 @@ app.post('/api/faculty/override-locked/:sessionId', async (req, res) => {
 
 app.post('/api/faculty/start-session', async (req, res) => {
     try {
-        const { topic, courseCode, section, facultyId, facultyName } = req.body;
+        const { topic, courseCode, section, facultyId, facultyName, tokenRotation } = req.body;
         if (!topic || !topic.trim()) return res.status(400).json({ error: 'Topic required' });
         if (!courseCode) return res.status(400).json({ error: 'Course required' });
         if (!section) return res.status(400).json({ error: 'Section required' });
@@ -548,12 +548,13 @@ app.post('/api/faculty/start-session', async (req, res) => {
         const sessionId = sesId();
         const tok = token8();
         const now = Date.now();
+        const rotationMs = Math.max(10000, Math.min(120000, (tokenRotation || 30) * 1000));
 
         store.sessions[sessionId] = {
             sessionId, topic: topic.trim(), courseCode, section, facultyId, facultyName,
-            startedAt: now, status: 'opening', locked: false, overrides: []
+            startedAt: now, status: 'opening', locked: false, overrides: [], rotationMs
         };
-        store.currentToken[sessionId] = { token: tok, generatedAt: now, expiresAt: now + 30000 };
+        store.currentToken[sessionId] = { token: tok, generatedAt: now, expiresAt: now + rotationMs };
         store.scans[sessionId] = {};
 
         await pool.query(
@@ -561,9 +562,9 @@ app.post('/api/faculty/start-session', async (req, res) => {
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
             [sessionId, topic.trim(), courseCode, section, facultyId, facultyName, now, false, 'opening']
         );
-        await pool.query(`INSERT INTO current_tokens VALUES ($1,$2,$3,$4)`, [sessionId, tok, now, now + 30000]);
+        await pool.query(`INSERT INTO current_tokens VALUES ($1,$2,$3,$4)`, [sessionId, tok, now, now + rotationMs]);
 
-        startTokenRotation(sessionId);
+        startTokenRotation(sessionId, rotationMs);
 
         store.openingTimers[sessionId] = setTimeout(async () => {
             const s = store.sessions[sessionId];
@@ -576,7 +577,7 @@ app.post('/api/faculty/start-session', async (req, res) => {
         }, 10 * 60 * 1000);
 
         const qrImg = await QRCode.toDataURL(`${sessionId}|${tok}`, { width: 300, margin: 2 });
-        res.json({ sessionId, token: tok, qrCode: qrImg, expiresAt: now + 30000, session: store.sessions[sessionId] });
+        res.json({ sessionId, token: tok, qrCode: qrImg, expiresAt: now + rotationMs, rotationMs, session: store.sessions[sessionId] });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error' });
@@ -677,24 +678,12 @@ app.post('/api/faculty/start-closing/:sessionId', async (req, res) => {
         // Generate a FRESH token immediately
         const freshToken = token8();
         const now = Date.now();
-        store.currentToken[sessionId] = { token: freshToken, generatedAt: now, expiresAt: now + 30000 };
+        const rotationMs = s.rotationMs || 30000;
+        store.currentToken[sessionId] = { token: freshToken, generatedAt: now, expiresAt: now + rotationMs };
         await pool.query('UPDATE current_tokens SET token=$1, generated_at=$2, expires_at=$3 WHERE session_id=$4',
-            [freshToken, now, now + 30000, sessionId]);
-        
-        // Start fresh token rotation for closing window
-        store.rotateIntervals[sessionId] = setInterval(async () => {
-            const sess = store.sessions[sessionId];
-            if (!sess || sess.locked || sess.status !== 'closing') { 
-                clearInterval(store.rotateIntervals[sessionId]); 
-                delete store.rotateIntervals[sessionId];
-                return; 
-            }
-            const nt = token8();
-            const now2 = Date.now();
-            store.currentToken[sessionId] = { token: nt, generatedAt: now2, expiresAt: now2 + 30000 };
-            await pool.query(`UPDATE current_tokens SET token=$1, generated_at=$2, expires_at=$3 WHERE session_id=$4`,
-                [nt, now2, now2 + 30000, sessionId]);
-        }, 30000);
+            [freshToken, now, now + rotationMs, sessionId]);
+
+        startTokenRotation(sessionId, rotationMs);
         
         // Auto-lock closing after 10 min
         store.closingTimers[sessionId] = setTimeout(async () => {
@@ -706,7 +695,7 @@ app.post('/api/faculty/start-closing/:sessionId', async (req, res) => {
         
         const td = store.currentToken[sessionId];
         const qrImg = await QRCode.toDataURL(`${sessionId}|${td.token}`, { width: 300, margin: 2 });
-        res.json({ success: true, status: 'closing', token: td.token, qrCode: qrImg, expiresAt: td.expiresAt });
+        res.json({ success: true, status: 'closing', token: td.token, qrCode: qrImg, expiresAt: td.expiresAt, rotationMs });
     } catch (err) {
         console.error('Start closing error:', err);
         res.status(500).json({ error: err.message });
@@ -755,7 +744,8 @@ app.get('/api/faculty/token/:sessionId', async (req, res) => {
         const td = store.currentToken[sessionId];
         if (!td) return res.status(404).json({ error: 'No active token' });
         const s = store.sessions[sessionId];
-        if (s && (s.status === 'opening_locked' || s.locked)) {
+        const skipQr = req.query.qr === '0' || (s && (s.status === 'opening_locked' || s.locked));
+        if (skipQr) {
             return res.json({ token: td.token, qrCode: null, expiresAt: td.expiresAt });
         }
         const qrImg = await QRCode.toDataURL(`${sessionId}|${td.token}`, { width: 300, margin: 2 });
