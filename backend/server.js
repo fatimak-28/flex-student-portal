@@ -453,35 +453,8 @@ async function rosterForSession(sessionId) {
 
 async function restoreActiveSessions() {
     try {
-        const res = await pool.query('SELECT session_id FROM sessions WHERE locked = false');
-        for (const row of res.rows) {
-            const sessionRes = await pool.query('SELECT * FROM sessions WHERE session_id = $1', [row.session_id]);
-            const sd = sessionRes.rows[0];
-            if (!sd) continue;
-            const tokenRes = await pool.query('SELECT * FROM current_tokens WHERE session_id = $1', [sd.session_id]);
-            const td = tokenRes.rows[0];
-            store.sessions[sd.session_id] = {
-                sessionId: sd.session_id, topic: sd.topic, courseCode: sd.course_code,
-                section: sd.section, facultyId: sd.faculty_id, facultyName: sd.faculty_name,
-                startedAt: sd.started_at, status: sd.status, locked: sd.locked,
-                overrides: sd.overrides || []
-            };
-            if (td) {
-                store.currentToken[sd.session_id] = {
-                    token: td.token, generatedAt: td.generated_at, expiresAt: td.expires_at
-                };
-            }
-            store.scans[sd.session_id] = {};
-            const scansRes = await pool.query('SELECT * FROM scans WHERE session_id = $1', [sd.session_id]);
-            for (const scan of scansRes.rows) {
-                store.scans[sd.session_id][scan.roll_no] = {
-                    opening: scan.opening, closing: scan.closing,
-                    firstScanAt: scan.first_scan_at, secondScanAt: scan.second_scan_at
-                };
-            }
-            startTokenRotation(sd.session_id);
-            console.log(`🔄 Restored session: ${sd.session_id} (${sd.status})`);
-        }
+        const res = await pool.query('UPDATE sessions SET locked = true, status = $1 WHERE locked = false RETURNING session_id', ['locked']);
+        if (res.rowCount > 0) console.log(`🔒 ${res.rowCount} stale session(s) locked on restart.`);
         console.log('✅ Active sessions restored');
     } catch (err) {
         console.error('Session restore error:', err);
@@ -564,6 +537,13 @@ app.post('/api/faculty/start-session', async (req, res) => {
         if (!courseCode) return res.status(400).json({ error: 'Course required' });
         if (!section) return res.status(400).json({ error: 'Section required' });
         if (!facultyId) return res.status(400).json({ error: 'Faculty ID missing' });
+
+        const existingSession = Object.values(store.sessions).find(
+            s => s.facultyId === facultyId && s.section === section && s.courseCode === courseCode && !s.locked
+        );
+        if (existingSession) {
+            return res.status(400).json({ error: 'An active session already exists for this class. Please end it first.' });
+        }
 
         const sessionId = sesId();
         const tok = token8();
