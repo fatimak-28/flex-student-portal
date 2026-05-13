@@ -493,11 +493,17 @@ app.put('/api/faculty/session/:sessionId/topic', async (req, res) => {
         const { sessionId } = req.params;
         const { topic } = req.body;
         if (!topic || !topic.trim()) return res.status(400).json({ error: 'Topic cannot be empty' });
+
+        // Update in memory if session exists
         const s = store.sessions[sessionId];
-        if (!s) return res.status(404).json({ error: 'Session not found' });
-        s.topic = topic.trim();
+        if (s) {
+            s.topic = topic.trim();
+        }
+
+        // Update in database (works for both active and locked sessions)
         await pool.query('UPDATE sessions SET topic=$1 WHERE session_id=$2', [topic.trim(), sessionId]);
-        res.json({ success: true, topic: s.topic });
+
+        res.json({ success: true, topic: topic.trim() });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error' });
